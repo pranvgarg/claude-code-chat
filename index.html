@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Conversation Viewer</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2333;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --user-accent: #58a6ff;
+    --assistant-accent: #d2a8ff;
+    --tool-accent: #7ee787;
+    --thinking-accent: #f0883e;
+    --system-accent: #f778ba;
+    --progress-accent: #636c76;
+    --code-bg: #0d1117;
+    --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  /* Landing / drop zone */
+  #landing {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 20px;
+  }
+  #landing h1 { font-size: 1.6rem; font-weight: 600; }
+  #landing p { color: var(--text-muted); font-size: 0.9rem; }
+
+  #drop-zone {
+    width: 500px;
+    max-width: 90vw;
+    height: 200px;
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    gap: 12px;
+  }
+  #drop-zone:hover, #drop-zone.dragover {
+    border-color: var(--user-accent);
+    background: rgba(88, 166, 255, 0.05);
+  }
+  #drop-zone svg { opacity: 0.5; }
+  #drop-zone span { color: var(--text-muted); font-size: 0.95rem; }
+  #file-input { display: none; }
+
+  /* Header bar */
+  #header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  #header .title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+  #header .meta {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  #header .meta span { white-space: nowrap; }
+  #header .actions { margin-left: auto; display: flex; gap: 8px; }
+
+  .btn {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: var(--border); }
+  .btn.active { background: var(--user-accent); color: #000; border-color: var(--user-accent); }
+
+  /* Filter bar */
+  #filters {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 20px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  #filters label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+  #filters input[type="checkbox"] { accent-color: var(--user-accent); }
+  #search-box {
+    margin-left: auto;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    width: 220px;
+  }
+  #search-box::placeholder { color: var(--text-muted); }
+
+  /* Conversation container */
+  #conversation {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  /* Message bubbles */
+  .entry {
+    border-radius: 10px;
+    padding: 14px 18px;
+    position: relative;
+    font-size: 0.9rem;
+    overflow-wrap: break-word;
+  }
+  .entry.user {
+    background: var(--surface);
+    border-left: 3px solid var(--user-accent);
+  }
+  .entry.assistant {
+    background: var(--surface2);
+    border-left: 3px solid var(--assistant-accent);
+  }
+  .entry.system-entry {
+    background: transparent;
+    border-left: 3px solid var(--system-accent);
+    opacity: 0.7;
+    font-size: 0.8rem;
+  }
+  .entry.progress-entry {
+    background: transparent;
+    border-left: 2px solid var(--progress-accent);
+    opacity: 0.5;
+    font-size: 0.78rem;
+    padding: 6px 14px;
+  }
+  .entry.snapshot-entry {
+    background: transparent;
+    border-left: 2px solid var(--progress-accent);
+    opacity: 0.4;
+    font-size: 0.78rem;
+    padding: 4px 14px;
+  }
+
+  .entry-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+  .entry-header .role {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.72rem;
+  }
+  .entry.user .role { color: var(--user-accent); }
+  .entry.assistant .role { color: var(--assistant-accent); }
+  .entry.system-entry .role { color: var(--system-accent); }
+
+  .model-badge {
+    background: rgba(210, 168, 255, 0.15);
+    color: var(--assistant-accent);
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+  }
+
+  /* Content rendering */
+  .text-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.65;
+  }
+
+  .thinking-block {
+    background: rgba(240, 136, 62, 0.08);
+    border: 1px solid rgba(240, 136, 62, 0.2);
+    border-radius: 6px;
+    margin: 8px 0;
+    overflow: hidden;
+  }
+  .thinking-header {
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    color: var(--thinking-accent);
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .thinking-header:hover { background: rgba(240, 136, 62, 0.05); }
+  .thinking-body {
+    padding: 8px 12px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+    word-break: break-word;
+    border-top: 1px solid rgba(240, 136, 62, 0.15);
+    display: none;
+    max-height: 500px;
+    overflow-y: auto;
+  }
+  .thinking-body.open { display: block; }
+
+  .tool-block {
+    background: rgba(126, 231, 135, 0.06);
+    border: 1px solid rgba(126, 231, 135, 0.18);
+    border-radius: 6px;
+    margin: 8px 0;
+    overflow: hidden;
+  }
+  .tool-header {
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    color: var(--tool-accent);
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tool-header:hover { background: rgba(126, 231, 135, 0.04); }
+  .tool-name {
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+  .tool-body {
+    border-top: 1px solid rgba(126, 231, 135, 0.12);
+    display: none;
+    max-height: 600px;
+    overflow-y: auto;
+  }
+  .tool-body.open { display: block; }
+  .tool-input, .tool-result-content {
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text-muted);
+  }
+  .tool-input { background: var(--code-bg); }
+  .tool-result-content {
+    background: rgba(0,0,0,0.2);
+    border-top: 1px dashed var(--border);
+  }
+  .tool-result-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    padding: 4px 12px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Token usage bar */
+  .usage-bar {
+    margin-top: 8px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .usage-bar span { white-space: nowrap; }
+
+  /* Chevron */
+  .chevron {
+    display: inline-block;
+    transition: transform 0.15s;
+    font-size: 0.7rem;
+  }
+  .chevron.open { transform: rotate(90deg); }
+
+  /* Search highlight */
+  mark {
+    background: rgba(88, 166, 255, 0.3);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div id="landing">
+  <h1>Claude Code Conversation Viewer</h1>
+  <p>Load any .jsonl conversation file exported from Claude Code</p>
+  <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+    </svg>
+    <span>Drop .jsonl file here or click to browse</span>
+  </div>
+  <input type="file" id="file-input" accept=".jsonl">
+</div>
+
+<div id="app" style="display:none;">
+  <div id="header">
+    <span class="title" id="file-name"></span>
+    <div class="meta" id="session-meta"></div>
+    <div class="actions">
+      <button class="btn" id="btn-collapse-all" title="Collapse all tool/thinking blocks">Collapse All</button>
+      <button class="btn" id="btn-new-file">Load Another</button>
+    </div>
+  </div>
+  <div id="filters">
+    <label><input type="checkbox" data-filter="user" checked> User</label>
+    <label><input type="checkbox" data-filter="assistant" checked> Assistant</label>
+    <label><input type="checkbox" data-filter="system" checked> System</label>
+    <label><input type="checkbox" data-filter="progress"> Progress</label>
+    <label><input type="checkbox" data-filter="file-history-snapshot"> Snapshots</label>
+    <input type="text" id="search-box" placeholder="Search messages…">
+  </div>
+  <div id="conversation"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+let allEntries = [];
+let toolResults = {};  // tool_use_id -> result content
+
+// --- File loading ---
+const dropZone = $('#drop-zone');
+const fileInput = $('#file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length) loadFile(fileInput.files[0]); });
+$('#btn-new-file').addEventListener('click', () => {
+  $('#app').style.display = 'none';
+  $('#landing').style.display = 'flex';
+  fileInput.value = '';
+});
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const lines = reader.result.split('\n').filter(l => l.trim());
+    allEntries = [];
+    toolResults = {};
+    for (const line of lines) {
+      try { allEntries.push(JSON.parse(line)); } catch {}
+    }
+    preprocessToolResults();
+    showApp(file.name);
+  };
+  reader.readAsText(file);
+}
+
+function preprocessToolResults() {
+  // user entries with toolUseResult map back to a tool_use_id via sourceToolAssistantUUID
+  // Also scan user message content for tool_result blocks
+  for (const entry of allEntries) {
+    if (entry.type === 'user' && entry.toolUseResult !== undefined) {
+      // The sourceToolAssistantUUID points to the assistant message, but we need the tool_use_id
+      // Store by the user entry's uuid so we can match later
+      toolResults['user:' + entry.uuid] = entry.toolUseResult;
+    }
+    // Also look inside user message content arrays for tool_result
+    if (entry.type === 'user' && entry.message?.content && Array.isArray(entry.message.content)) {
+      for (const block of entry.message.content) {
+        if (block.type === 'tool_result' && block.tool_use_id) {
+          toolResults[block.tool_use_id] = block.content || block;
+        }
+      }
+    }
+  }
+
+  // Also scan assistant entries for tool_result blocks inline
+  for (const entry of allEntries) {
+    if (entry.type === 'assistant' && entry.message?.content) {
+      for (const block of entry.message.content) {
+        if (block.type === 'tool_result' && block.tool_use_id) {
+          toolResults[block.tool_use_id] = block.content || block;
+        }
+      }
+    }
+  }
+
+  // Map user entries that are tool results by their sourceToolAssistantUUID
+  // Find the tool_use_id from the assistant message
+  const assistantById = {};
+  for (const entry of allEntries) {
+    if (entry.type === 'assistant') assistantById[entry.uuid] = entry;
+  }
+  for (const entry of allEntries) {
+    if (entry.type === 'user' && entry.sourceToolAssistantUUID && entry.toolUseResult !== undefined) {
+      const assistantEntry = assistantById[entry.sourceToolAssistantUUID];
+      if (assistantEntry?.message?.content) {
+        for (const block of assistantEntry.message.content) {
+          if (block.type === 'tool_use') {
+            toolResults[block.id] = entry.toolUseResult;
+          }
+        }
+      }
+    }
+  }
+}
+
+function showApp(fileName) {
+  $('#landing').style.display = 'none';
+  $('#app').style.display = '';
+  $('#file-name').textContent = fileName;
+
+  const sessionId = allEntries.find(e => e.sessionId)?.sessionId || '';
+  const branch = allEntries.find(e => e.gitBranch)?.gitBranch || '';
+  const version = allEntries.find(e => e.version)?.version || '';
+  const slug = allEntries.find(e => e.slug)?.slug || '';
+  const counts = {};
+  for (const e of allEntries) counts[e.type] = (counts[e.type] || 0) + 1;
+  const countStr = Object.entries(counts).map(([k,v]) => `${k}: ${v}`).join(', ');
+
+  $('#session-meta').innerHTML = [
+    slug && `<span title="Session slug">${esc(slug)}</span>`,
+    branch && `<span>branch: ${esc(branch)}</span>`,
+    version && `<span>v${esc(version)}</span>`,
+    `<span>${allEntries.length} entries (${countStr})</span>`,
+  ].filter(Boolean).join('');
+
+  render();
+
+  // Bind filters
+  for (const cb of $$('#filters input[type=checkbox]')) {
+    cb.onchange = render;
+  }
+  $('#search-box').oninput = debounce(render, 200);
+  $('#btn-collapse-all').onclick = () => {
+    for (const el of $$('.thinking-body.open, .tool-body.open')) el.classList.remove('open');
+    for (const el of $$('.chevron.open')) el.classList.remove('open');
+  };
+}
+
+function render() {
+  const filters = new Set();
+  for (const cb of $$('#filters input[type=checkbox]')) {
+    if (cb.checked) filters.add(cb.dataset.filter);
+  }
+  const search = $('#search-box').value.trim().toLowerCase();
+  const conv = $('#conversation');
+  conv.innerHTML = '';
+
+  for (const entry of allEntries) {
+    if (!filters.has(entry.type)) {
+      // last-prompt entries shown with system, file-history-snapshot is its own filter
+      if (entry.type === 'last-prompt' && !filters.has('system')) continue;
+      if (entry.type !== 'last-prompt') continue;
+    }
+
+    // User entries that are just tool results — skip rendering standalone (shown inline with tool)
+    if (entry.type === 'user' && entry.toolUseResult !== undefined && !entry.message?.content) continue;
+    if (entry.type === 'user' && entry.toolUseResult !== undefined) {
+      const content = entry.message?.content;
+      if (typeof content === 'string' && content.trim() === '') continue;
+      if (Array.isArray(content) && content.every(b => b.type === 'tool_result')) continue;
+    }
+
+    const el = renderEntry(entry, search);
+    if (el) {
+      if (search && !el.dataset.match) continue;
+      conv.appendChild(el);
+    }
+  }
+}
+
+function renderEntry(entry, search) {
+  const div = document.createElement('div');
+
+  switch (entry.type) {
+    case 'user': return renderUser(div, entry, search);
+    case 'assistant': return renderAssistant(div, entry, search);
+    case 'system': return renderSystem(div, entry, search);
+    case 'progress': return renderProgress(div, entry, search);
+    case 'file-history-snapshot': return renderSnapshot(div, entry);
+    case 'last-prompt': return renderLastPrompt(div, entry, search);
+    default: return null;
+  }
+}
+
+function renderUser(div, entry, search) {
+  div.className = 'entry user';
+  const content = entry.message?.content;
+  const text = typeof content === 'string' ? content : (Array.isArray(content)
+    ? content.filter(b => b.type === 'text').map(b => b.text).join('\n')
+    : JSON.stringify(content));
+
+  if (search && !text.toLowerCase().includes(search)) return (div.dataset.match = '', div);
+
+  const ts = fmtTime(entry.timestamp);
+  div.innerHTML = `
+    <div class="entry-header">
+      <span class="role">User</span>
+      <span>${ts}</span>
+    </div>
+    <div class="text-content">${search ? highlight(esc(text), search) : esc(text)}</div>
+  `;
+  div.dataset.match = '1';
+  return div;
+}
+
+function renderAssistant(div, entry, search) {
+  div.className = 'entry assistant';
+  const msg = entry.message || {};
+  const blocks = msg.content || [];
+  const ts = fmtTime(entry.timestamp);
+  const model = msg.model || '';
+  const usage = msg.usage;
+
+  let hasMatch = !search;
+  let html = `<div class="entry-header">
+    <span class="role">Assistant</span>
+    ${model ? `<span class="model-badge">${esc(model)}</span>` : ''}
+    <span>${ts}</span>
+  </div>`;
+
+  for (const block of blocks) {
+    switch (block.type) {
+      case 'text': {
+        const t = block.text || '';
+        if (search && t.toLowerCase().includes(search)) hasMatch = true;
+        html += `<div class="text-content">${search ? highlight(esc(t), search) : esc(t)}</div>`;
+        break;
+      }
+      case 'thinking': {
+        const t = block.thinking || '';
+        if (!t.trim()) {
+          html += `<div class="thinking-block"><div class="thinking-header"><span class="chevron">▶</span> Thinking (empty/redacted)</div></div>`;
+        } else {
+          if (search && t.toLowerCase().includes(search)) hasMatch = true;
+          const id = 'th-' + Math.random().toString(36).slice(2, 9);
+          html += `<div class="thinking-block">
+            <div class="thinking-header" onclick="toggleBlock('${id}', this)">
+              <span class="chevron">▶</span> Thinking (${t.length.toLocaleString()} chars)
+            </div>
+            <div class="thinking-body" id="${id}">${search ? highlight(esc(t), search) : esc(t)}</div>
+          </div>`;
+        }
+        break;
+      }
+      case 'tool_use': {
+        const name = block.name || 'unknown';
+        const input = block.input || {};
+        const inputStr = formatToolInput(name, input);
+        const result = toolResults[block.id];
+        if (search && (inputStr.toLowerCase().includes(search) || name.toLowerCase().includes(search))) hasMatch = true;
+        const id = 'tu-' + Math.random().toString(36).slice(2, 9);
+        const summary = toolSummary(name, input);
+        html += `<div class="tool-block">
+          <div class="tool-header" onclick="toggleBlock('${id}', this)">
+            <span class="chevron">▶</span>
+            <span class="tool-name">${esc(name)}</span>
+            <span style="color:var(--text-muted)">${esc(summary)}</span>
+          </div>
+          <div class="tool-body" id="${id}">
+            <div class="tool-input">${search ? highlight(esc(inputStr), search) : esc(inputStr)}</div>
+            ${result !== undefined ? `<div class="tool-result-label">Result</div><div class="tool-result-content">${esc(truncate(typeof result === 'string' ? result : JSON.stringify(result, null, 2), 8000))}</div>` : ''}
+          </div>
+        </div>`;
+        break;
+      }
+      // tool_result blocks rendered inline with tool_use above
+    }
+  }
+
+  // Usage bar
+  if (usage) {
+    const parts = [];
+    if (usage.input_tokens) parts.push(`in: ${usage.input_tokens.toLocaleString()}`);
+    if (usage.output_tokens) parts.push(`out: ${usage.output_tokens.toLocaleString()}`);
+    if (usage.cache_read_input_tokens) parts.push(`cache read: ${usage.cache_read_input_tokens.toLocaleString()}`);
+    if (usage.cache_creation_input_tokens) parts.push(`cache write: ${usage.cache_creation_input_tokens.toLocaleString()}`);
+    if (parts.length) html += `<div class="usage-bar">${parts.map(p => `<span>${p}</span>`).join('')}</div>`;
+  }
+
+  div.innerHTML = html;
+  div.dataset.match = hasMatch ? '1' : '';
+  return div;
+}
+
+function renderSystem(div, entry, search) {
+  div.className = 'entry system-entry';
+  const subtype = entry.subtype || 'system';
+  const dur = entry.durationMs ? ` — ${(entry.durationMs / 1000).toFixed(1)}s` : '';
+  const ts = fmtTime(entry.timestamp);
+  const text = `${subtype}${dur}`;
+  if (search && !text.toLowerCase().includes(search)) { div.dataset.match = ''; return div; }
+  div.innerHTML = `<div class="entry-header"><span class="role">System</span><span>${ts}</span></div><span>${esc(text)}</span>`;
+  div.dataset.match = '1';
+  return div;
+}
+
+function renderProgress(div, entry, search) {
+  div.className = 'entry progress-entry';
+  const data = entry.data || {};
+  const parts = [data.type || 'progress'];
+  if (data.command) parts.push(truncate(data.command, 100));
+  if (data.hookName) parts.push(`hook: ${data.hookName}`);
+  const text = parts.join(' — ');
+  if (search && !text.toLowerCase().includes(search)) { div.dataset.match = ''; return div; }
+  div.textContent = text;
+  div.dataset.match = '1';
+  return div;
+}
+
+function renderSnapshot(div, entry) {
+  div.className = 'entry snapshot-entry';
+  const snap = entry.snapshot || {};
+  const files = Object.keys(snap.trackedFileBackups || {});
+  div.textContent = `📸 file snapshot — ${files.length} file(s) tracked`;
+  div.dataset.match = '1';
+  return div;
+}
+
+function renderLastPrompt(div, entry, search) {
+  div.className = 'entry system-entry';
+  const text = entry.lastPrompt || '';
+  if (search && !text.toLowerCase().includes(search)) { div.dataset.match = ''; return div; }
+  div.innerHTML = `<div class="entry-header"><span class="role">Last Prompt</span></div><div class="text-content">${esc(truncate(text, 500))}</div>`;
+  div.dataset.match = '1';
+  return div;
+}
+
+// --- Helpers ---
+
+function formatToolInput(name, input) {
+  switch (name) {
+    case 'Bash': return input.command || JSON.stringify(input, null, 2);
+    case 'Read': return input.file_path || JSON.stringify(input, null, 2);
+    case 'Write': return `${input.file_path || ''}\n---\n${truncate(input.content || '', 3000)}`;
+    case 'Edit': return `${input.file_path || ''}\n--- old ---\n${input.old_string || ''}\n--- new ---\n${input.new_string || ''}`;
+    case 'Grep': return `pattern: ${input.pattern || ''}${input.path ? '  path: ' + input.path : ''}${input.glob ? '  glob: ' + input.glob : ''}`;
+    case 'Glob': return `pattern: ${input.pattern || ''}${input.path ? '  path: ' + input.path : ''}`;
+    case 'Agent': return `[${input.subagent_type || 'general'}] ${input.prompt || ''}`;
+    default: return JSON.stringify(input, null, 2);
+  }
+}
+
+function toolSummary(name, input) {
+  switch (name) {
+    case 'Bash': return truncate(input.command || '', 60);
+    case 'Read': return shortPath(input.file_path || '');
+    case 'Write': return shortPath(input.file_path || '');
+    case 'Edit': return shortPath(input.file_path || '');
+    case 'Grep': return input.pattern || '';
+    case 'Glob': return input.pattern || '';
+    case 'Agent': return input.description || truncate(input.prompt || '', 50);
+    default: return '';
+  }
+}
+
+function shortPath(p) {
+  const parts = p.replace(/\\/g, '/').split('/');
+  return parts.length > 3 ? '…/' + parts.slice(-3).join('/') : p;
+}
+
+function toggleBlock(id, headerEl) {
+  const body = document.getElementById(id);
+  if (!body) return;
+  body.classList.toggle('open');
+  const chev = headerEl.querySelector('.chevron');
+  if (chev) chev.classList.toggle('open');
+}
+// Expose globally for onclick handlers
+window.toggleBlock = toggleBlock;
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function highlight(html, term) {
+  if (!term) return html;
+  const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  return html.replace(regex, '<mark>$1</mark>');
+}
+
+function truncate(s, max) {
+  return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
+function fmtTime(ts) {
+  if (!ts) return '';
+  try {
+    const d = new Date(ts);
+    return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch { return ts; }
+}
+
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "claude-code-conversation.schema.json",
+  "title": "Claude Code Conversation JSONL Entry",
+  "description": "Schema for a single line in a Claude Code conversation .jsonl file. Each line is one of several entry types.",
+  "oneOf": [
+    { "$ref": "#/$defs/AssistantEntry" },
+    { "$ref": "#/$defs/UserEntry" },
+    { "$ref": "#/$defs/ProgressEntry" },
+    { "$ref": "#/$defs/SystemEntry" },
+    { "$ref": "#/$defs/FileHistorySnapshotEntry" },
+    { "$ref": "#/$defs/LastPromptEntry" }
+  ],
+
+  "$defs": {
+    "CommonFields": {
+      "type": "object",
+      "properties": {
+        "uuid":        { "type": "string", "format": "uuid" },
+        "parentUuid":  { "type": ["string", "null"], "format": "uuid" },
+        "sessionId":   { "type": "string", "format": "uuid" },
+        "timestamp":   { "type": "string", "format": "date-time" },
+        "version":     { "type": "string", "description": "Claude Code CLI version, e.g. 2.1.72" },
+        "cwd":         { "type": "string", "description": "Working directory at time of entry" },
+        "gitBranch":   { "type": "string" },
+        "slug":        { "type": "string", "description": "Human-readable session name, e.g. transient-wondering-starlight" },
+        "isSidechain": { "type": "boolean" },
+        "userType":    { "type": "string", "enum": ["external", "internal"] }
+      },
+      "required": ["uuid", "sessionId", "timestamp", "type"]
+    },
+
+    "AssistantEntry": {
+      "allOf": [{ "$ref": "#/$defs/CommonFields" }],
+      "type": "object",
+      "properties": {
+        "type":      { "const": "assistant" },
+        "requestId": { "type": "string" },
+        "message":   { "$ref": "#/$defs/AssistantMessage" }
+      },
+      "required": ["type", "message"]
+    },
+
+    "AssistantMessage": {
+      "type": "object",
+      "properties": {
+        "model":         { "type": "string", "description": "Model ID, e.g. claude-opus-4-6" },
+        "id":            { "type": "string", "description": "Anthropic message ID, e.g. msg_01..." },
+        "type":          { "const": "message" },
+        "role":          { "const": "assistant" },
+        "stop_reason":   { "type": ["string", "null"], "enum": ["end_turn", "tool_use", null] },
+        "stop_sequence": { "type": ["string", "null"] },
+        "content":       { "type": "array", "items": { "$ref": "#/$defs/ContentBlock" } },
+        "usage":         { "$ref": "#/$defs/Usage" }
+      },
+      "required": ["role", "content"]
+    },
+
+    "ContentBlock": {
+      "oneOf": [
+        { "$ref": "#/$defs/TextBlock" },
+        { "$ref": "#/$defs/ThinkingBlock" },
+        { "$ref": "#/$defs/ToolUseBlock" },
+        { "$ref": "#/$defs/ToolResultBlock" }
+      ]
+    },
+
+    "TextBlock": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "text" },
+        "text": { "type": "string" }
+      },
+      "required": ["type", "text"]
+    },
+
+    "ThinkingBlock": {
+      "type": "object",
+      "properties": {
+        "type":      { "const": "thinking" },
+        "thinking":  { "type": "string" },
+        "signature": { "type": "string" }
+      },
+      "required": ["type", "thinking"]
+    },
+
+    "ToolUseBlock": {
+      "type": "object",
+      "properties": {
+        "type":   { "const": "tool_use" },
+        "id":     { "type": "string" },
+        "name":   { "type": "string", "description": "Tool name, e.g. Bash, Read, Edit, Write, Glob, Grep, Agent" },
+        "input":  { "type": "object", "description": "Tool-specific input parameters" },
+        "caller": { "type": "string", "description": "Optional caller context" }
+      },
+      "required": ["type", "id", "name", "input"]
+    },
+
+    "ToolResultBlock": {
+      "type": "object",
+      "properties": {
+        "type":        { "const": "tool_result" },
+        "tool_use_id": { "type": "string" },
+        "content":     { "type": ["string", "array", "object"] }
+      },
+      "required": ["type"]
+    },
+
+    "Usage": {
+      "type": "object",
+      "properties": {
+        "input_tokens":                 { "type": "integer" },
+        "output_tokens":                { "type": "integer" },
+        "cache_creation_input_tokens":  { "type": "integer" },
+        "cache_read_input_tokens":      { "type": "integer" },
+        "cache_creation": {
+          "type": "object",
+          "properties": {
+            "ephemeral_1h_input_tokens": { "type": "integer" },
+            "ephemeral_5m_input_tokens": { "type": "integer" }
+          }
+        },
+        "server_tool_use": {
+          "type": "object",
+          "properties": {
+            "web_search_requests": { "type": "integer" },
+            "web_fetch_requests":  { "type": "integer" }
+          }
+        },
+        "service_tier":  { "type": "string" },
+        "inference_geo": { "type": "string" },
+        "speed":         { "type": "string" },
+        "iterations":    { "type": "array" }
+      }
+    },
+
+    "UserEntry": {
+      "allOf": [{ "$ref": "#/$defs/CommonFields" }],
+      "type": "object",
+      "properties": {
+        "type":    { "const": "user" },
+        "message": { "$ref": "#/$defs/UserMessage" },
+        "isMeta":  { "type": "boolean" },
+        "permissionMode":         { "type": "string", "description": "Permission mode active for this message" },
+        "planContent":            { "type": "string", "description": "Active plan text if in plan mode" },
+        "toolUseResult":          { "type": ["object", "string"], "description": "Result from a tool execution" },
+        "sourceToolAssistantUUID": { "type": "string", "description": "UUID of the assistant message that issued the tool call" }
+      },
+      "required": ["type", "message"]
+    },
+
+    "UserMessage": {
+      "type": "object",
+      "properties": {
+        "role":    { "const": "user" },
+        "content": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "$ref": "#/$defs/ContentBlock" } }
+          ]
+        }
+      },
+      "required": ["role", "content"]
+    },
+
+    "ProgressEntry": {
+      "allOf": [{ "$ref": "#/$defs/CommonFields" }],
+      "type": "object",
+      "properties": {
+        "type":              { "const": "progress" },
+        "toolUseID":         { "type": "string" },
+        "parentToolUseID":   { "type": "string" },
+        "data": {
+          "type": "object",
+          "properties": {
+            "type":      { "type": "string", "description": "Progress event type" },
+            "command":   { "type": "string", "description": "Bash command being executed" },
+            "prompt":    { "type": "string", "description": "Agent prompt" },
+            "agentId":   { "type": "string" },
+            "hookEvent": { "type": "string" },
+            "hookName":  { "type": "string" },
+            "message":   { "type": "object", "description": "Streamed content chunk" }
+          }
+        }
+      },
+      "required": ["type", "toolUseID", "data"]
+    },
+
+    "SystemEntry": {
+      "allOf": [{ "$ref": "#/$defs/CommonFields" }],
+      "type": "object",
+      "properties": {
+        "type":       { "const": "system" },
+        "subtype":    { "type": "string", "enum": ["turn_duration"] },
+        "durationMs": { "type": "integer", "description": "Turn duration in milliseconds" },
+        "isMeta":     { "type": "boolean" }
+      },
+      "required": ["type", "subtype"]
+    },
+
+    "FileHistorySnapshotEntry": {
+      "type": "object",
+      "properties": {
+        "type":             { "const": "file-history-snapshot" },
+        "messageId":        { "type": "string" },
+        "isSnapshotUpdate": { "type": "boolean" },
+        "snapshot": {
+          "type": "object",
+          "properties": {
+            "messageId":          { "type": "string" },
+            "trackedFileBackups": { "type": "object", "description": "Map of filepath to backup content" },
+            "timestamp":          { "type": "string", "format": "date-time" }
+          },
+          "required": ["messageId", "trackedFileBackups", "timestamp"]
+        }
+      },
+      "required": ["type", "messageId", "snapshot"]
+    },
+
+    "LastPromptEntry": {
+      "type": "object",
+      "properties": {
+        "type":       { "const": "last-prompt" },
+        "lastPrompt": { "type": "string" },
+        "sessionId":  { "type": "string" }
+      },
+      "required": ["type", "lastPrompt", "sessionId"]
+    }
+  }
+}
