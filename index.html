@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Claude Code Conversation Viewer</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism-tomorrow.min.css" onerror="this.disabled=true">
 <style>
   :root {
     --bg: #0d1117;
@@ -21,6 +22,28 @@
     --code-bg: #0d1117;
     --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
     --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+
+  [data-theme="light"] {
+    --bg: #ffffff;
+    --surface: #f6f8fa;
+    --surface2: #eef1f5;
+    --border: #d0d7de;
+    --text: #1f2328;
+    --text-muted: #656d76;
+    --user-accent: #0969da;
+    --assistant-accent: #8250df;
+    --tool-accent: #1a7f37;
+    --thinking-accent: #bc4c00;
+    --system-accent: #bf3989;
+    --progress-accent: #afb8c1;
+    --code-bg: #f6f8fa;
+  }
+
+  [data-theme="light"] code[class*="language-"],
+  [data-theme="light"] pre[class*="language-"] {
+    color: #1f2328;
+    background: #f6f8fa;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -138,8 +161,80 @@
   }
   #search-box::placeholder { color: var(--text-muted); }
 
+  /* Phase 6: Search navigation */
+  mark.active-match { background: rgba(255, 200, 50, 0.6); outline: 2px solid rgba(255, 200, 50, 0.8); border-radius: 2px; }
+  #search-nav .btn { padding: 2px 8px; font-size: 0.75rem; }
+
+  /* Phase 7: Main layout and sidebar */
+  #main-layout { display: flex; }
+  #sidebar {
+    width: 0;
+    overflow: hidden;
+    transition: width 0.2s ease;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 85px;
+    height: calc(100vh - 85px);
+    flex-shrink: 0;
+  }
+  #sidebar.sidebar-open {
+    width: 280px;
+    overflow-y: auto;
+  }
+  #sidebar-content { padding: 8px; }
+  .toc-item {
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    border-left: 2px solid transparent;
+    margin-bottom: 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    transition: background 0.1s;
+  }
+  .toc-item:hover { background: var(--surface2); }
+  .toc-item .toc-role {
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.65rem;
+    letter-spacing: 0.5px;
+  }
+  .toc-item.toc-user { border-left-color: var(--user-accent); }
+  .toc-item.toc-user .toc-role { color: var(--user-accent); }
+  .toc-item.toc-assistant { border-left-color: var(--assistant-accent); }
+  .toc-item.toc-assistant .toc-role { color: var(--assistant-accent); }
+  .toc-item.toc-system { border-left-color: var(--system-accent); }
+  .toc-item.toc-system .toc-role { color: var(--system-accent); }
+  .toc-item .toc-preview {
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 250px;
+  }
+  .toc-item .toc-time {
+    color: var(--text-muted);
+    font-size: 0.65rem;
+  }
+
+  @media (max-width: 768px) {
+    #sidebar.sidebar-open {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      z-index: 200;
+      width: 280px;
+    }
+  }
+
   /* Conversation container */
   #conversation {
+    flex: 1;
+    min-width: 0;
     max-width: 960px;
     margin: 0 auto;
     padding: 20px;
@@ -217,6 +312,22 @@
     word-break: break-word;
     line-height: 1.65;
   }
+
+  /* Markdown content */
+  .md-content { line-height: 1.7; }
+  .md-content h1, .md-content h2, .md-content h3, .md-content h4 { margin: 0.8em 0 0.4em; font-weight: 600; }
+  .md-content h1 { font-size: 1.3em; } .md-content h2 { font-size: 1.15em; } .md-content h3 { font-size: 1.05em; }
+  .md-content code { background: var(--code-bg); padding: 2px 5px; border-radius: 3px; font-family: var(--font-mono); font-size: 0.85em; }
+  .md-content pre { background: var(--code-bg); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 8px 0; }
+  .md-content pre code { background: none; padding: 0; font-size: 0.82rem; }
+  .md-content a { color: var(--user-accent); text-decoration: underline; }
+  .md-content ul, .md-content ol { padding-left: 1.5em; margin: 0.5em 0; }
+  .md-content blockquote { border-left: 3px solid var(--border); padding-left: 12px; color: var(--text-muted); margin: 0.5em 0; }
+  .md-content table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+  .md-content th, .md-content td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+  .md-content th { background: var(--surface); }
+  .md-content p { margin: 0.4em 0; }
+  .md-content li { margin: 0.2em 0; }
 
   .thinking-block {
     background: rgba(240, 136, 62, 0.08);
@@ -326,6 +437,38 @@
     padding: 0 1px;
   }
 
+  /* Show full button (Phase 5) */
+  .show-full-btn { margin-left: 8px; font-size: 0.7rem; padding: 1px 6px; vertical-align: middle; }
+
+  /* Phase 8: Date separators and time deltas */
+  .date-separator {
+    text-align: center;
+    padding: 16px 0 8px;
+  }
+  .date-separator span {
+    background: var(--surface);
+    padding: 4px 14px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .time-delta {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-style: italic;
+    opacity: 0.8;
+  }
+
+  /* Phase 9: Inline images */
+  .inline-image {
+    max-width: 100%;
+    max-height: 400px;
+    border-radius: 6px;
+    margin: 8px 0;
+    display: block;
+  }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -343,6 +486,7 @@
     </svg>
     <span>Drop .jsonl file here or click to browse</span>
   </div>
+  <button class="btn" id="btn-theme-landing" title="Toggle light/dark theme" style="margin-top:8px">☀️</button>
   <input type="file" id="file-input" accept=".jsonl">
 </div>
 
@@ -351,6 +495,9 @@
     <span class="title" id="file-name"></span>
     <div class="meta" id="session-meta"></div>
     <div class="actions">
+      <button class="btn" id="btn-sidebar" title="Toggle conversation outline">☰ TOC</button>
+      <button class="btn" id="btn-theme" title="Toggle light/dark theme">☀️</button>
+      <button class="btn" id="btn-expand-all" title="Expand all tool/thinking blocks">Expand All</button>
       <button class="btn" id="btn-collapse-all" title="Collapse all tool/thinking blocks">Collapse All</button>
       <button class="btn" id="btn-new-file">Load Another</button>
     </div>
@@ -362,18 +509,792 @@
     <label><input type="checkbox" data-filter="progress"> Progress</label>
     <label><input type="checkbox" data-filter="file-history-snapshot"> Snapshots</label>
     <input type="text" id="search-box" placeholder="Search messages…">
+    <span id="search-nav" style="display:none;align-items:center;gap:4px;">
+      <span id="search-count" style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap;"></span>
+      <button class="btn" id="btn-search-prev" title="Previous match (Shift+Enter)">▲</button>
+      <button class="btn" id="btn-search-next" title="Next match (Enter)">▼</button>
+    </span>
   </div>
-  <div id="conversation"></div>
+  <div id="main-layout">
+    <aside id="sidebar" class="sidebar-closed">
+      <div id="sidebar-content"></div>
+    </aside>
+    <div id="conversation"></div>
+  </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js" onerror="window.__markedFailed=true"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/prism.min.js" onerror="window.__prismFailed=true"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-python.min.js" onerror=""></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js" onerror=""></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js" onerror=""></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-typescript.min.js" onerror=""></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-javascript.min.js" onerror=""></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-css.min.js" onerror=""></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-markup.min.js" onerror=""></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-yaml.min.js" onerror=""></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-rust.min.js" onerror=""></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-go.min.js" onerror=""></script>
 <script>
+// Disable Prism's auto-highlighting
+if (window.Prism) window.Prism.manual = true;
+
+// Top-level convenience aliases
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
-let allEntries = [];
-let toolResults = {};  // tool_use_id -> result content
+const ChatViewer = {
+  // --- State ---
+  state: {
+    allEntries: [],
+    toolResults: {},
+    searchIndex: 0,
+    searchMatches: [],
+    theme: 'dark',
+    sidebarOpen: false,
+  },
 
-// --- File loading ---
+  // --- IO: file loading and preprocessing ---
+  io: {
+    loadFile: function(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const lines = reader.result.split('\n').filter(l => l.trim());
+        ChatViewer.state.allEntries = [];
+        ChatViewer.state.toolResults = {};
+        for (const line of lines) {
+          try { ChatViewer.state.allEntries.push(JSON.parse(line)); } catch {}
+        }
+        ChatViewer.io.preprocessToolResults();
+        ChatViewer.render.showApp(file.name);
+      };
+      reader.readAsText(file);
+    },
+
+    preprocessToolResults: function() {
+      const allEntries = ChatViewer.state.allEntries;
+      const toolResults = ChatViewer.state.toolResults;
+
+      for (const entry of allEntries) {
+        if (entry.type === 'user' && entry.toolUseResult !== undefined) {
+          toolResults['user:' + entry.uuid] = entry.toolUseResult;
+        }
+        if (entry.type === 'user' && entry.message?.content && Array.isArray(entry.message.content)) {
+          for (const block of entry.message.content) {
+            if (block.type === 'tool_result' && block.tool_use_id) {
+              toolResults[block.tool_use_id] = block.content || block;
+            }
+          }
+        }
+      }
+
+      for (const entry of allEntries) {
+        if (entry.type === 'assistant' && entry.message?.content) {
+          for (const block of entry.message.content) {
+            if (block.type === 'tool_result' && block.tool_use_id) {
+              toolResults[block.tool_use_id] = block.content || block;
+            }
+          }
+        }
+      }
+
+      const assistantById = {};
+      for (const entry of allEntries) {
+        if (entry.type === 'assistant') assistantById[entry.uuid] = entry;
+      }
+      for (const entry of allEntries) {
+        if (entry.type === 'user' && entry.sourceToolAssistantUUID && entry.toolUseResult !== undefined) {
+          const assistantEntry = assistantById[entry.sourceToolAssistantUUID];
+          if (assistantEntry?.message?.content) {
+            for (const block of assistantEntry.message.content) {
+              if (block.type === 'tool_use') {
+                toolResults[block.id] = entry.toolUseResult;
+              }
+            }
+          }
+        }
+      }
+    },
+  },
+
+  // --- Render: display logic ---
+  render: {
+    showApp: function(fileName) {
+      $('#landing').style.display = 'none';
+      $('#app').style.display = '';
+      $('#file-name').textContent = fileName;
+
+      const allEntries = ChatViewer.state.allEntries;
+      const sessionId = allEntries.find(e => e.sessionId)?.sessionId || '';
+      const branch = allEntries.find(e => e.gitBranch)?.gitBranch || '';
+      const version = allEntries.find(e => e.version)?.version || '';
+      const slug = allEntries.find(e => e.slug)?.slug || '';
+      const counts = {};
+      for (const e of allEntries) counts[e.type] = (counts[e.type] || 0) + 1;
+      const countStr = Object.entries(counts).map(([k,v]) => `${k}: ${v}`).join(', ');
+
+      // Phase 10: Calculate total session cost
+      let totalCost = 0;
+      for (const e of allEntries) {
+        if (e.type === 'assistant' && e.message?.usage) {
+          totalCost += ChatViewer.format.estimateCost(e.message.model || '', e.message.usage);
+        }
+      }
+
+      $('#session-meta').innerHTML = [
+        slug && `<span title="Session slug">${ChatViewer.util.esc(slug)}</span>`,
+        branch && `<span>branch: ${ChatViewer.util.esc(branch)}</span>`,
+        version && `<span>v${ChatViewer.util.esc(version)}</span>`,
+        `<span>${allEntries.length} entries (${countStr})</span>`,
+        totalCost > 0 && `<span>Est. cost: $${totalCost.toFixed(2)}</span>`,
+      ].filter(Boolean).join('');
+
+      // Sync theme button text in header
+      $('#btn-theme').textContent = ChatViewer.state.theme === 'dark' ? '☀️' : '🌙';
+
+      ChatViewer.render.render();
+      ChatViewer.ui.bindEvents();
+    },
+
+    render: function() {
+      const filters = new Set();
+      for (const cb of $$('#filters input[type=checkbox]')) {
+        if (cb.checked) filters.add(cb.dataset.filter);
+      }
+      const search = $('#search-box').value.trim().toLowerCase();
+      const conv = $('#conversation');
+      conv.innerHTML = '';
+
+      let entryIdx = 0;
+      let lastDateStr = '';
+      let lastTimestamp = null;
+      for (const entry of ChatViewer.state.allEntries) {
+        if (!filters.has(entry.type)) {
+          if (entry.type === 'last-prompt' && !filters.has('system')) continue;
+          if (entry.type !== 'last-prompt') continue;
+        }
+
+        if (entry.type === 'user' && entry.toolUseResult !== undefined && !entry.message?.content) continue;
+        if (entry.type === 'user' && entry.toolUseResult !== undefined) {
+          const content = entry.message?.content;
+          if (typeof content === 'string' && content.trim() === '') continue;
+          if (Array.isArray(content) && content.every(b => b.type === 'tool_result')) continue;
+        }
+
+        const el = ChatViewer.render.renderEntry(entry, search, lastTimestamp);
+        if (el) {
+          if (search && !el.dataset.match) continue;
+
+          // Phase 8: Date separator
+          if (entry.timestamp) {
+            try {
+              const dateStr = new Date(entry.timestamp).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+              if (dateStr !== lastDateStr) {
+                const sep = document.createElement('div');
+                sep.className = 'date-separator';
+                sep.innerHTML = '<span>' + ChatViewer.util.esc(dateStr) + '</span>';
+                conv.appendChild(sep);
+                lastDateStr = dateStr;
+              }
+            } catch {}
+          }
+
+          el.setAttribute('data-entry-idx', entryIdx);
+          conv.appendChild(el);
+          entryIdx++;
+          // Update lastTimestamp after rendering
+          if (entry.timestamp) lastTimestamp = entry.timestamp;
+        }
+      }
+
+      // Phase 6: Update search navigation after render
+      if (search) {
+        ChatViewer.ui.updateSearchNav();
+      } else {
+        $('#search-nav').style.display = 'none';
+        ChatViewer.state.searchMatches = [];
+      }
+
+      // Phase 7: Build sidebar TOC after render
+      ChatViewer.ui.buildSidebar();
+    },
+
+    renderEntry: function(entry, search, lastTimestamp) {
+      const div = document.createElement('div');
+
+      switch (entry.type) {
+        case 'user': return ChatViewer.render.renderUser(div, entry, search, lastTimestamp);
+        case 'assistant': return ChatViewer.render.renderAssistant(div, entry, search, lastTimestamp);
+        case 'system': return ChatViewer.render.renderSystem(div, entry, search, lastTimestamp);
+        case 'progress': return ChatViewer.render.renderProgress(div, entry, search);
+        case 'file-history-snapshot': return ChatViewer.render.renderSnapshot(div, entry);
+        case 'last-prompt': return ChatViewer.render.renderLastPrompt(div, entry, search);
+        default: return null;
+      }
+    },
+
+    renderUser: function(div, entry, search, lastTimestamp) {
+      div.className = 'entry user';
+      const content = entry.message?.content;
+      const text = typeof content === 'string' ? content : (Array.isArray(content)
+        ? content.filter(b => b.type === 'text').map(b => b.text).join('\n')
+        : JSON.stringify(content));
+
+      if (search && !text.toLowerCase().includes(search)) return (div.dataset.match = '', div);
+
+      const ts = ChatViewer.util.fmtTime(entry.timestamp);
+      const delta = ChatViewer.util.relativeTimeDelta(lastTimestamp, entry.timestamp);
+      const deltaHtml = delta ? ' <span class="time-delta">' + ChatViewer.util.esc(delta) + '</span>' : '';
+
+      // Phase 9: Check for image blocks
+      let imageHtml = '';
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block.type === 'image') {
+            const src = block.source?.type === 'base64'
+              ? 'data:' + (block.source.media_type || 'image/png') + ';base64,' + block.source.data
+              : (block.source?.url || '');
+            if (src) {
+              imageHtml += '<img class="inline-image" src="' + src + '" alt="User image">';
+            }
+          }
+        }
+      }
+
+      div.innerHTML = `
+        <div class="entry-header">
+          <span class="role">User</span>
+          <span>${ts}</span>${deltaHtml}
+        </div>
+        <div class="text-content">${search ? ChatViewer.util.highlight(ChatViewer.util.esc(text), search) : ChatViewer.util.esc(text)}</div>
+        ${imageHtml}
+      `;
+      div.dataset.match = '1';
+      return div;
+    },
+
+    renderAssistant: function(div, entry, search, lastTimestamp) {
+      div.className = 'entry assistant';
+      const msg = entry.message || {};
+      const blocks = msg.content || [];
+      const ts = ChatViewer.util.fmtTime(entry.timestamp);
+      const model = msg.model || '';
+      const usage = msg.usage;
+      const esc = ChatViewer.util.esc;
+      const highlight = ChatViewer.util.highlight;
+      const truncate = ChatViewer.util.truncate;
+      const truncateWithExpand = ChatViewer.util.truncateWithExpand;
+      const renderMarkdown = ChatViewer.format.renderMarkdown;
+      const highlightCode = ChatViewer.format.highlightCode;
+      const detectLang = ChatViewer.format.detectLang;
+      const toolResults = ChatViewer.state.toolResults;
+
+      const delta = ChatViewer.util.relativeTimeDelta(lastTimestamp, entry.timestamp);
+      const deltaHtml = delta ? ' <span class="time-delta">' + esc(delta) + '</span>' : '';
+
+      let hasMatch = !search;
+      let html = `<div class="entry-header">
+        <span class="role">Assistant</span>
+        ${model ? `<span class="model-badge">${esc(model)}</span>` : ''}
+        <span>${ts}</span>${deltaHtml}
+      </div>`;
+
+      for (const block of blocks) {
+        switch (block.type) {
+          case 'text': {
+            const t = block.text || '';
+            if (search && t.toLowerCase().includes(search)) hasMatch = true;
+            if (search) {
+              html += `<div class="text-content">${highlight(esc(t), search)}</div>`;
+            } else {
+              html += `<div class="md-content">${renderMarkdown(t)}</div>`;
+            }
+            break;
+          }
+          case 'thinking': {
+            const t = block.thinking || '';
+            if (!t.trim()) {
+              html += `<div class="thinking-block"><div class="thinking-header"><span class="chevron">▶</span> Thinking (empty/redacted)</div></div>`;
+            } else {
+              if (search && t.toLowerCase().includes(search)) hasMatch = true;
+              const id = 'th-' + Math.random().toString(36).slice(2, 9);
+              html += `<div class="thinking-block">
+                <div class="thinking-header" onclick="toggleBlock('${id}', this)">
+                  <span class="chevron">▶</span> Thinking (${t.length.toLocaleString()} chars)
+                </div>
+                <div class="thinking-body" id="${id}">${search ? highlight(esc(t), search) : esc(t)}</div>
+              </div>`;
+            }
+            break;
+          }
+          case 'tool_use': {
+            const name = block.name || 'unknown';
+            const input = block.input || {};
+            const inputStr = ChatViewer.format.formatToolInput(name, input);
+            const result = toolResults[block.id];
+            if (search && (inputStr.toLowerCase().includes(search) || name.toLowerCase().includes(search))) hasMatch = true;
+            const id = 'tu-' + Math.random().toString(36).slice(2, 9);
+            const summary = ChatViewer.format.toolSummary(name, input);
+            const lang = detectLang(name, input);
+            var highlightedInput;
+            if (name === 'Write' && !search && inputStr.length > 3000) {
+              const writeHeader = (input.file_path || '') + '\n---\n';
+              const writeContent = input.content || '';
+              const writeId = 'wt-' + id;
+              highlightedInput = esc(writeHeader) + truncateWithExpand(writeContent, 3000, writeId);
+            } else if (name === 'Write' && !search) {
+              highlightedInput = lang ? highlightCode(inputStr, lang) : esc(inputStr);
+            } else {
+              highlightedInput = search ? highlight(esc(inputStr), search) : (lang ? highlightCode(inputStr, lang) : esc(inputStr));
+            }
+            html += `<div class="tool-block">
+              <div class="tool-header" onclick="toggleBlock('${id}', this)">
+                <span class="chevron">▶</span>
+                <span class="tool-name">${esc(name)}</span>
+                <span style="color:var(--text-muted)">${esc(summary)}</span>
+              </div>
+              <div class="tool-body" id="${id}">
+                <div class="tool-input">${highlightedInput}</div>
+                ${result !== undefined ? `<div class="tool-result-label">Result</div><div class="tool-result-content">${truncateWithExpand(typeof result === 'string' ? result : JSON.stringify(result, null, 2), 8000, 'tr-' + id)}</div>` : ''}
+              </div>
+            </div>`;
+            break;
+          }
+          // tool_result blocks rendered inline with tool_use above
+        }
+      }
+
+      // Usage bar
+      if (usage) {
+        const parts = [];
+        if (usage.input_tokens) parts.push(`in: ${usage.input_tokens.toLocaleString()}`);
+        if (usage.output_tokens) parts.push(`out: ${usage.output_tokens.toLocaleString()}`);
+        if (usage.cache_read_input_tokens) parts.push(`cache read: ${usage.cache_read_input_tokens.toLocaleString()}`);
+        if (usage.cache_creation_input_tokens) parts.push(`cache write: ${usage.cache_creation_input_tokens.toLocaleString()}`);
+        // Phase 10: Per-turn cost
+        const cost = ChatViewer.format.estimateCost(model, usage);
+        if (cost > 0) parts.push('~$' + cost.toFixed(4));
+        if (parts.length) html += `<div class="usage-bar">${parts.map(p => `<span>${p}</span>`).join('')}</div>`;
+      }
+
+      div.innerHTML = html;
+      div.dataset.match = hasMatch ? '1' : '';
+      return div;
+    },
+
+    renderSystem: function(div, entry, search, lastTimestamp) {
+      div.className = 'entry system-entry';
+      const subtype = entry.subtype || 'system';
+      const dur = entry.durationMs ? ` — ${(entry.durationMs / 1000).toFixed(1)}s` : '';
+      const ts = ChatViewer.util.fmtTime(entry.timestamp);
+      const text = `${subtype}${dur}`;
+      if (search && !text.toLowerCase().includes(search)) { div.dataset.match = ''; return div; }
+      const delta = ChatViewer.util.relativeTimeDelta(lastTimestamp, entry.timestamp);
+      const deltaHtml = delta ? ' <span class="time-delta">' + ChatViewer.util.esc(delta) + '</span>' : '';
+      div.innerHTML = `<div class="entry-header"><span class="role">System</span><span>${ts}</span>${deltaHtml}</div><span>${ChatViewer.util.esc(text)}</span>`;
+      div.dataset.match = '1';
+      return div;
+    },
+
+    renderProgress: function(div, entry, search) {
+      div.className = 'entry progress-entry';
+      const data = entry.data || {};
+      const parts = [data.type || 'progress'];
+      if (data.command) parts.push(ChatViewer.util.truncate(data.command, 100));
+      if (data.hookName) parts.push(`hook: ${data.hookName}`);
+      const text = parts.join(' — ');
+      if (search && !text.toLowerCase().includes(search)) { div.dataset.match = ''; return div; }
+      div.textContent = text;
+      div.dataset.match = '1';
+      return div;
+    },
+
+    renderSnapshot: function(div, entry) {
+      div.className = 'entry snapshot-entry';
+      const snap = entry.snapshot || {};
+      const files = Object.keys(snap.trackedFileBackups || {});
+      div.textContent = `📸 file snapshot — ${files.length} file(s) tracked`;
+      div.dataset.match = '1';
+      return div;
+    },
+
+    renderLastPrompt: function(div, entry, search) {
+      div.className = 'entry system-entry';
+      const text = entry.lastPrompt || '';
+      if (search && !text.toLowerCase().includes(search)) { div.dataset.match = ''; return div; }
+      const lpId = 'lp-' + Math.random().toString(36).slice(2, 9);
+      div.innerHTML = `<div class="entry-header"><span class="role">Last Prompt</span></div><div class="text-content">${ChatViewer.util.truncateWithExpand(text, 500, lpId)}</div>`;
+      div.dataset.match = '1';
+      return div;
+    },
+  },
+
+  // --- Format: tool input/output formatting ---
+  format: {
+    // Phase 10: Pricing table [input_per_1M, output_per_1M, cache_read_per_1M, cache_write_per_1M]
+    PRICING: {
+      'opus':   [15, 75, 1.5, 18.75],
+      'sonnet': [3, 15, 0.3, 3.75],
+      'haiku':  [0.8, 4, 0.08, 1],
+    },
+
+    // Phase 10: Estimate cost for a single turn
+    estimateCost: function(model, usage) {
+      if (!model || !usage) return 0;
+      const modelLower = (model || '').toLowerCase();
+      let rates = ChatViewer.format.PRICING['sonnet']; // default
+      for (const key in ChatViewer.format.PRICING) {
+        if (modelLower.includes(key)) { rates = ChatViewer.format.PRICING[key]; break; }
+      }
+      const cost = (
+        (usage.input_tokens || 0) * rates[0] +
+        (usage.output_tokens || 0) * rates[1] +
+        (usage.cache_read_input_tokens || 0) * rates[2] +
+        (usage.cache_creation_input_tokens || 0) * rates[3]
+      ) / 1000000;
+      return cost;
+    },
+
+    formatToolInput: function(name, input) {
+      const truncate = ChatViewer.util.truncate;
+      const truncateWithExpand = ChatViewer.util.truncateWithExpand;
+      switch (name) {
+        case 'Bash': return input.command || JSON.stringify(input, null, 2);
+        case 'Read': return input.file_path || JSON.stringify(input, null, 2);
+        case 'Write': return `${input.file_path || ''}\n---\n${input.content || ''}`;
+        case 'Edit': return `${input.file_path || ''}\n--- old ---\n${input.old_string || ''}\n--- new ---\n${input.new_string || ''}`;
+        case 'Grep': return `pattern: ${input.pattern || ''}${input.path ? '  path: ' + input.path : ''}${input.glob ? '  glob: ' + input.glob : ''}`;
+        case 'Glob': return `pattern: ${input.pattern || ''}${input.path ? '  path: ' + input.path : ''}`;
+        case 'Agent': return `[${input.subagent_type || 'general'}] ${input.prompt || ''}`;
+        default: return JSON.stringify(input, null, 2);
+      }
+    },
+
+    toolSummary: function(name, input) {
+      const truncate = ChatViewer.util.truncate;
+      const shortPath = ChatViewer.format.shortPath;
+      switch (name) {
+        case 'Bash': return truncate(input.command || '', 60);
+        case 'Read': return shortPath(input.file_path || '');
+        case 'Write': return shortPath(input.file_path || '');
+        case 'Edit': return shortPath(input.file_path || '');
+        case 'Grep': return input.pattern || '';
+        case 'Glob': return input.pattern || '';
+        case 'Agent': return input.description || truncate(input.prompt || '', 50);
+        default: return '';
+      }
+    },
+
+    shortPath: function(p) {
+      const parts = p.replace(/\\/g, '/').split('/');
+      return parts.length > 3 ? '…/' + parts.slice(-3).join('/') : p;
+    },
+
+    renderMarkdown: function(text) {
+      if (!window.marked) {
+        return ChatViewer.util.esc(text);
+      }
+      try {
+        const renderer = new marked.Renderer();
+        renderer.code = function(code, lang) {
+          const language = lang || '';
+          const highlighted = ChatViewer.format.highlightCode(code, language);
+          return `<pre class="code-block"><code class="language-${ChatViewer.util.esc(language)}">${highlighted}</code></pre>`;
+        };
+        const raw = marked.parse(text, { breaks: true, gfm: true, renderer: renderer });
+        return ChatViewer.format.sanitizeHtml(raw);
+      } catch (e) {
+        return ChatViewer.util.esc(text);
+      }
+    },
+
+    sanitizeHtml: function(html) {
+      const allowedTags = new Set([
+        'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'a', 'code', 'pre',
+        'ul', 'ol', 'li', 'blockquote', 'br', 'hr', 'table', 'thead', 'tbody', 'tr',
+        'th', 'td', 'span', 'div', 'img', 'mark'
+      ]);
+      // Strip disallowed tags but keep their content
+      let result = html.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*\/?>/g, function(match, tagName) {
+        const tag = tagName.toLowerCase();
+        if (!allowedTags.has(tag)) {
+          return '';
+        }
+        return match;
+      });
+      // Ensure <a> tags have target="_blank" rel="noopener"
+      result = result.replace(/<a\b([^>]*)>/g, function(match, attrs) {
+        // Remove existing target and rel attributes
+        let cleaned = attrs.replace(/\s*target\s*=\s*("[^"]*"|'[^']*'|\S+)/gi, '');
+        cleaned = cleaned.replace(/\s*rel\s*=\s*("[^"]*"|'[^']*'|\S+)/gi, '');
+        return `<a${cleaned} target="_blank" rel="noopener">`;
+      });
+      return result;
+    },
+
+    highlightCode: function(code, lang) {
+      if (window.Prism && lang && Prism.languages[lang]) {
+        return Prism.highlight(code, Prism.languages[lang], lang);
+      }
+      return ChatViewer.util.esc(code);
+    },
+
+    detectLang: function(toolName, input) {
+      if (toolName === 'Bash') return 'bash';
+      if (toolName === 'Read' || toolName === 'Write' || toolName === 'Edit') {
+        const filePath = input.file_path || '';
+        const ext = filePath.split('.').pop().toLowerCase();
+        const extMap = {
+          py: 'python', js: 'javascript', ts: 'typescript', jsx: 'javascript',
+          tsx: 'typescript', json: 'json', rs: 'rust', go: 'go', html: 'markup',
+          css: 'css', rb: 'ruby', sh: 'bash', yml: 'yaml', yaml: 'yaml', md: 'markdown'
+        };
+        return extMap[ext] || '';
+      }
+      return '';
+    },
+  },
+
+  // --- UI: user interaction ---
+  ui: {
+    toggleBlock: function(id, headerEl) {
+      const body = document.getElementById(id);
+      if (!body) return;
+      body.classList.toggle('open');
+      const chev = headerEl.querySelector('.chevron');
+      if (chev) chev.classList.toggle('open');
+    },
+
+    collapseAll: function() {
+      for (const el of $$('.thinking-body.open, .tool-body.open')) el.classList.remove('open');
+      for (const el of $$('.chevron.open')) el.classList.remove('open');
+    },
+
+    expandAll: function() {
+      for (const el of $$('.thinking-body:not(.open), .tool-body:not(.open)')) el.classList.add('open');
+      for (const el of $$('.chevron:not(.open)')) el.classList.add('open');
+    },
+
+    toggleTheme: function() {
+      ChatViewer.state.theme = ChatViewer.state.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = ChatViewer.state.theme;
+      var themeBtn = $('#btn-theme');
+      if (themeBtn) themeBtn.textContent = ChatViewer.state.theme === 'dark' ? '☀️' : '🌙';
+      var landingBtn = $('#btn-theme-landing');
+      if (landingBtn) landingBtn.textContent = ChatViewer.state.theme === 'dark' ? '☀️' : '🌙';
+      localStorage.setItem('cv-theme', ChatViewer.state.theme);
+    },
+
+    showFull: function(id) {
+      const trunc = document.getElementById(id + '-trunc');
+      const full = document.getElementById(id + '-full');
+      if (trunc) trunc.style.display = 'none';
+      if (full) full.style.display = 'inline';
+    },
+
+    // Phase 6: Search navigation
+    updateSearchNav: function() {
+      var marks = Array.from(document.querySelectorAll('#conversation mark'));
+      ChatViewer.state.searchMatches = marks;
+      if (marks.length === 0) {
+        $('#search-nav').style.display = 'none';
+        return;
+      }
+      $('#search-nav').style.display = 'flex';
+      // Clamp index to valid range
+      if (ChatViewer.state.searchIndex < 0) ChatViewer.state.searchIndex = 0;
+      if (ChatViewer.state.searchIndex >= marks.length) ChatViewer.state.searchIndex = marks.length - 1;
+      // Remove active-match from all
+      for (var i = 0; i < marks.length; i++) {
+        marks[i].classList.remove('active-match');
+      }
+      // Add active-match to current
+      marks[ChatViewer.state.searchIndex].classList.add('active-match');
+      $('#search-count').textContent = (ChatViewer.state.searchIndex + 1) + ' of ' + marks.length;
+      marks[ChatViewer.state.searchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    },
+
+    searchNext: function() {
+      if (!ChatViewer.state.searchMatches.length) return;
+      ChatViewer.state.searchIndex = (ChatViewer.state.searchIndex + 1) % ChatViewer.state.searchMatches.length;
+      ChatViewer.ui.updateSearchNav();
+    },
+
+    searchPrev: function() {
+      if (!ChatViewer.state.searchMatches.length) return;
+      ChatViewer.state.searchIndex = (ChatViewer.state.searchIndex - 1 + ChatViewer.state.searchMatches.length) % ChatViewer.state.searchMatches.length;
+      ChatViewer.ui.updateSearchNav();
+    },
+
+    // Phase 7: Sidebar TOC
+    toggleSidebar: function() {
+      const sb = $('#sidebar');
+      const isOpen = sb.classList.contains('sidebar-open');
+      sb.classList.toggle('sidebar-open', !isOpen);
+      sb.classList.toggle('sidebar-closed', isOpen);
+      ChatViewer.state.sidebarOpen = !isOpen;
+    },
+
+    buildSidebar: function() {
+      var entries = document.querySelectorAll('#conversation .entry');
+      var sidebarContent = $('#sidebar-content');
+      sidebarContent.innerHTML = '';
+
+      for (var i = 0; i < entries.length; i++) {
+        var entryEl = entries[i];
+        var role = null;
+        var roleLabel = '';
+        var tocClass = '';
+
+        if (entryEl.classList.contains('user')) {
+          role = 'user';
+          roleLabel = 'User';
+          tocClass = 'toc-user';
+        } else if (entryEl.classList.contains('assistant')) {
+          role = 'assistant';
+          roleLabel = 'Assistant';
+          tocClass = 'toc-assistant';
+        } else {
+          // Skip system, progress, snapshot entries
+          continue;
+        }
+
+        // Extract preview text
+        var previewEl = entryEl.querySelector('.text-content') || entryEl.querySelector('.md-content');
+        var previewText = '';
+        if (previewEl) {
+          previewText = previewEl.textContent.slice(0, 50).trim();
+        }
+        if (!previewText) {
+          previewText = entryEl.textContent.slice(0, 50).trim();
+        }
+
+        // Get timestamp from entry header
+        var headerSpans = entryEl.querySelectorAll('.entry-header span');
+        var timeText = '';
+        if (headerSpans.length >= 2) {
+          timeText = headerSpans[headerSpans.length - 1].textContent;
+        }
+
+        // Create TOC item
+        var tocItem = document.createElement('div');
+        tocItem.className = 'toc-item ' + tocClass;
+        tocItem.setAttribute('data-entry-idx', entryEl.getAttribute('data-entry-idx'));
+
+        var innerHtml = '<span class="toc-role">' + ChatViewer.util.esc(roleLabel) + '</span>';
+        innerHtml += '<span class="toc-preview">' + ChatViewer.util.esc(previewText) + '</span>';
+        if (timeText) {
+          innerHtml += '<span class="toc-time">' + ChatViewer.util.esc(timeText) + '</span>';
+        }
+        tocItem.innerHTML = innerHtml;
+
+        // Click handler to scroll to entry
+        (function(targetEl) {
+          tocItem.addEventListener('click', function() {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        })(entryEl);
+
+        sidebarContent.appendChild(tocItem);
+      }
+    },
+
+    bindEvents: function() {
+      for (const cb of $$('#filters input[type=checkbox]')) {
+        cb.onchange = ChatViewer.render.render;
+      }
+      $('#search-box').oninput = ChatViewer.util.debounce(ChatViewer.render.render, 200);
+      $('#btn-collapse-all').onclick = ChatViewer.ui.collapseAll;
+      $('#btn-expand-all').onclick = ChatViewer.ui.expandAll;
+      $('#btn-theme').onclick = ChatViewer.ui.toggleTheme;
+
+      // Phase 6: Search navigation bindings
+      $('#btn-search-next').onclick = ChatViewer.ui.searchNext;
+      $('#btn-search-prev').onclick = ChatViewer.ui.searchPrev;
+      $('#search-box').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (e.shiftKey) ChatViewer.ui.searchPrev();
+          else ChatViewer.ui.searchNext();
+        }
+      });
+
+      // Phase 7: Sidebar toggle binding
+      $('#btn-sidebar').onclick = ChatViewer.ui.toggleSidebar;
+    },
+  },
+
+  // --- Util: pure helpers ---
+  util: {
+    $: $,
+    $$: $$,
+
+    esc: function(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    },
+
+    highlight: function(html, term) {
+      if (!term) return html;
+      const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+      return html.replace(regex, '<mark>$1</mark>');
+    },
+
+    truncate: function(s, max) {
+      return s.length > max ? s.slice(0, max) + '…' : s;
+    },
+
+    truncateWithExpand: function(text, max, id) {
+      if (text.length <= max) return ChatViewer.util.esc(text);
+      var truncId = id + '-trunc';
+      var fullId = id + '-full';
+      return ChatViewer.util.esc(text.slice(0, max)) +
+        '<span id="' + truncId + '">…<button class="btn show-full-btn" onclick="ChatViewer.ui.showFull(\'' + id + '\')">Show full (' + (text.length / 1024).toFixed(1) + 'KB)</button></span>' +
+        '<span id="' + fullId + '" style="display:none">' + ChatViewer.util.esc(text.slice(max)) + '</span>';
+    },
+
+    fmtTime: function(ts) {
+      if (!ts) return '';
+      try {
+        const d = new Date(ts);
+        return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      } catch { return ts; }
+    },
+
+    // Phase 8: Relative time delta between two timestamps
+    relativeTimeDelta: function(prev, curr) {
+      if (!prev || !curr) return '';
+      const diff = new Date(curr) - new Date(prev);
+      if (diff < 60000) return '';  // < 1 min
+      if (diff < 3600000) return Math.round(diff / 60000) + ' min later';
+      if (diff < 86400000) return Math.round(diff / 3600000) + 'h later';
+      return Math.round(diff / 86400000) + 'd later';
+    },
+
+    debounce: function(fn, ms) {
+      let t;
+      return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+    },
+  },
+};
+
+// Ensure ChatViewer is accessible from onclick handlers
+window.ChatViewer = ChatViewer;
+
+// Expose toggleBlock globally for inline onclick handlers
+window.toggleBlock = ChatViewer.ui.toggleBlock;
+
+// --- Theme initialization (load saved theme early) ---
+(function() {
+  var saved = localStorage.getItem('cv-theme');
+  if (saved) {
+    ChatViewer.state.theme = saved;
+    document.documentElement.dataset.theme = saved;
+  }
+})();
+
+// --- File loading event bindings (landing page) ---
 const dropZone = $('#drop-zone');
 const fileInput = $('#file-input');
 
@@ -382,373 +1303,20 @@ dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover
 dropZone.addEventListener('drop', e => {
   e.preventDefault();
   dropZone.classList.remove('dragover');
-  if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+  if (e.dataTransfer.files.length) ChatViewer.io.loadFile(e.dataTransfer.files[0]);
 });
-fileInput.addEventListener('change', () => { if (fileInput.files.length) loadFile(fileInput.files[0]); });
+fileInput.addEventListener('change', () => { if (fileInput.files.length) ChatViewer.io.loadFile(fileInput.files[0]); });
 $('#btn-new-file').addEventListener('click', () => {
   $('#app').style.display = 'none';
   $('#landing').style.display = 'flex';
   fileInput.value = '';
 });
 
-function loadFile(file) {
-  const reader = new FileReader();
-  reader.onload = () => {
-    const lines = reader.result.split('\n').filter(l => l.trim());
-    allEntries = [];
-    toolResults = {};
-    for (const line of lines) {
-      try { allEntries.push(JSON.parse(line)); } catch {}
-    }
-    preprocessToolResults();
-    showApp(file.name);
-  };
-  reader.readAsText(file);
-}
-
-function preprocessToolResults() {
-  // user entries with toolUseResult map back to a tool_use_id via sourceToolAssistantUUID
-  // Also scan user message content for tool_result blocks
-  for (const entry of allEntries) {
-    if (entry.type === 'user' && entry.toolUseResult !== undefined) {
-      // The sourceToolAssistantUUID points to the assistant message, but we need the tool_use_id
-      // Store by the user entry's uuid so we can match later
-      toolResults['user:' + entry.uuid] = entry.toolUseResult;
-    }
-    // Also look inside user message content arrays for tool_result
-    if (entry.type === 'user' && entry.message?.content && Array.isArray(entry.message.content)) {
-      for (const block of entry.message.content) {
-        if (block.type === 'tool_result' && block.tool_use_id) {
-          toolResults[block.tool_use_id] = block.content || block;
-        }
-      }
-    }
-  }
-
-  // Also scan assistant entries for tool_result blocks inline
-  for (const entry of allEntries) {
-    if (entry.type === 'assistant' && entry.message?.content) {
-      for (const block of entry.message.content) {
-        if (block.type === 'tool_result' && block.tool_use_id) {
-          toolResults[block.tool_use_id] = block.content || block;
-        }
-      }
-    }
-  }
-
-  // Map user entries that are tool results by their sourceToolAssistantUUID
-  // Find the tool_use_id from the assistant message
-  const assistantById = {};
-  for (const entry of allEntries) {
-    if (entry.type === 'assistant') assistantById[entry.uuid] = entry;
-  }
-  for (const entry of allEntries) {
-    if (entry.type === 'user' && entry.sourceToolAssistantUUID && entry.toolUseResult !== undefined) {
-      const assistantEntry = assistantById[entry.sourceToolAssistantUUID];
-      if (assistantEntry?.message?.content) {
-        for (const block of assistantEntry.message.content) {
-          if (block.type === 'tool_use') {
-            toolResults[block.id] = entry.toolUseResult;
-          }
-        }
-      }
-    }
-  }
-}
-
-function showApp(fileName) {
-  $('#landing').style.display = 'none';
-  $('#app').style.display = '';
-  $('#file-name').textContent = fileName;
-
-  const sessionId = allEntries.find(e => e.sessionId)?.sessionId || '';
-  const branch = allEntries.find(e => e.gitBranch)?.gitBranch || '';
-  const version = allEntries.find(e => e.version)?.version || '';
-  const slug = allEntries.find(e => e.slug)?.slug || '';
-  const counts = {};
-  for (const e of allEntries) counts[e.type] = (counts[e.type] || 0) + 1;
-  const countStr = Object.entries(counts).map(([k,v]) => `${k}: ${v}`).join(', ');
-
-  $('#session-meta').innerHTML = [
-    slug && `<span title="Session slug">${esc(slug)}</span>`,
-    branch && `<span>branch: ${esc(branch)}</span>`,
-    version && `<span>v${esc(version)}</span>`,
-    `<span>${allEntries.length} entries (${countStr})</span>`,
-  ].filter(Boolean).join('');
-
-  render();
-
-  // Bind filters
-  for (const cb of $$('#filters input[type=checkbox]')) {
-    cb.onchange = render;
-  }
-  $('#search-box').oninput = debounce(render, 200);
-  $('#btn-collapse-all').onclick = () => {
-    for (const el of $$('.thinking-body.open, .tool-body.open')) el.classList.remove('open');
-    for (const el of $$('.chevron.open')) el.classList.remove('open');
-  };
-}
-
-function render() {
-  const filters = new Set();
-  for (const cb of $$('#filters input[type=checkbox]')) {
-    if (cb.checked) filters.add(cb.dataset.filter);
-  }
-  const search = $('#search-box').value.trim().toLowerCase();
-  const conv = $('#conversation');
-  conv.innerHTML = '';
-
-  for (const entry of allEntries) {
-    if (!filters.has(entry.type)) {
-      // last-prompt entries shown with system, file-history-snapshot is its own filter
-      if (entry.type === 'last-prompt' && !filters.has('system')) continue;
-      if (entry.type !== 'last-prompt') continue;
-    }
-
-    // User entries that are just tool results — skip rendering standalone (shown inline with tool)
-    if (entry.type === 'user' && entry.toolUseResult !== undefined && !entry.message?.content) continue;
-    if (entry.type === 'user' && entry.toolUseResult !== undefined) {
-      const content = entry.message?.content;
-      if (typeof content === 'string' && content.trim() === '') continue;
-      if (Array.isArray(content) && content.every(b => b.type === 'tool_result')) continue;
-    }
-
-    const el = renderEntry(entry, search);
-    if (el) {
-      if (search && !el.dataset.match) continue;
-      conv.appendChild(el);
-    }
-  }
-}
-
-function renderEntry(entry, search) {
-  const div = document.createElement('div');
-
-  switch (entry.type) {
-    case 'user': return renderUser(div, entry, search);
-    case 'assistant': return renderAssistant(div, entry, search);
-    case 'system': return renderSystem(div, entry, search);
-    case 'progress': return renderProgress(div, entry, search);
-    case 'file-history-snapshot': return renderSnapshot(div, entry);
-    case 'last-prompt': return renderLastPrompt(div, entry, search);
-    default: return null;
-  }
-}
-
-function renderUser(div, entry, search) {
-  div.className = 'entry user';
-  const content = entry.message?.content;
-  const text = typeof content === 'string' ? content : (Array.isArray(content)
-    ? content.filter(b => b.type === 'text').map(b => b.text).join('\n')
-    : JSON.stringify(content));
-
-  if (search && !text.toLowerCase().includes(search)) return (div.dataset.match = '', div);
-
-  const ts = fmtTime(entry.timestamp);
-  div.innerHTML = `
-    <div class="entry-header">
-      <span class="role">User</span>
-      <span>${ts}</span>
-    </div>
-    <div class="text-content">${search ? highlight(esc(text), search) : esc(text)}</div>
-  `;
-  div.dataset.match = '1';
-  return div;
-}
-
-function renderAssistant(div, entry, search) {
-  div.className = 'entry assistant';
-  const msg = entry.message || {};
-  const blocks = msg.content || [];
-  const ts = fmtTime(entry.timestamp);
-  const model = msg.model || '';
-  const usage = msg.usage;
-
-  let hasMatch = !search;
-  let html = `<div class="entry-header">
-    <span class="role">Assistant</span>
-    ${model ? `<span class="model-badge">${esc(model)}</span>` : ''}
-    <span>${ts}</span>
-  </div>`;
-
-  for (const block of blocks) {
-    switch (block.type) {
-      case 'text': {
-        const t = block.text || '';
-        if (search && t.toLowerCase().includes(search)) hasMatch = true;
-        html += `<div class="text-content">${search ? highlight(esc(t), search) : esc(t)}</div>`;
-        break;
-      }
-      case 'thinking': {
-        const t = block.thinking || '';
-        if (!t.trim()) {
-          html += `<div class="thinking-block"><div class="thinking-header"><span class="chevron">▶</span> Thinking (empty/redacted)</div></div>`;
-        } else {
-          if (search && t.toLowerCase().includes(search)) hasMatch = true;
-          const id = 'th-' + Math.random().toString(36).slice(2, 9);
-          html += `<div class="thinking-block">
-            <div class="thinking-header" onclick="toggleBlock('${id}', this)">
-              <span class="chevron">▶</span> Thinking (${t.length.toLocaleString()} chars)
-            </div>
-            <div class="thinking-body" id="${id}">${search ? highlight(esc(t), search) : esc(t)}</div>
-          </div>`;
-        }
-        break;
-      }
-      case 'tool_use': {
-        const name = block.name || 'unknown';
-        const input = block.input || {};
-        const inputStr = formatToolInput(name, input);
-        const result = toolResults[block.id];
-        if (search && (inputStr.toLowerCase().includes(search) || name.toLowerCase().includes(search))) hasMatch = true;
-        const id = 'tu-' + Math.random().toString(36).slice(2, 9);
-        const summary = toolSummary(name, input);
-        html += `<div class="tool-block">
-          <div class="tool-header" onclick="toggleBlock('${id}', this)">
-            <span class="chevron">▶</span>
-            <span class="tool-name">${esc(name)}</span>
-            <span style="color:var(--text-muted)">${esc(summary)}</span>
-          </div>
-          <div class="tool-body" id="${id}">
-            <div class="tool-input">${search ? highlight(esc(inputStr), search) : esc(inputStr)}</div>
-            ${result !== undefined ? `<div class="tool-result-label">Result</div><div class="tool-result-content">${esc(truncate(typeof result === 'string' ? result : JSON.stringify(result, null, 2), 8000))}</div>` : ''}
-          </div>
-        </div>`;
-        break;
-      }
-      // tool_result blocks rendered inline with tool_use above
-    }
-  }
-
-  // Usage bar
-  if (usage) {
-    const parts = [];
-    if (usage.input_tokens) parts.push(`in: ${usage.input_tokens.toLocaleString()}`);
-    if (usage.output_tokens) parts.push(`out: ${usage.output_tokens.toLocaleString()}`);
-    if (usage.cache_read_input_tokens) parts.push(`cache read: ${usage.cache_read_input_tokens.toLocaleString()}`);
-    if (usage.cache_creation_input_tokens) parts.push(`cache write: ${usage.cache_creation_input_tokens.toLocaleString()}`);
-    if (parts.length) html += `<div class="usage-bar">${parts.map(p => `<span>${p}</span>`).join('')}</div>`;
-  }
-
-  div.innerHTML = html;
-  div.dataset.match = hasMatch ? '1' : '';
-  return div;
-}
-
-function renderSystem(div, entry, search) {
-  div.className = 'entry system-entry';
-  const subtype = entry.subtype || 'system';
-  const dur = entry.durationMs ? ` — ${(entry.durationMs / 1000).toFixed(1)}s` : '';
-  const ts = fmtTime(entry.timestamp);
-  const text = `${subtype}${dur}`;
-  if (search && !text.toLowerCase().includes(search)) { div.dataset.match = ''; return div; }
-  div.innerHTML = `<div class="entry-header"><span class="role">System</span><span>${ts}</span></div><span>${esc(text)}</span>`;
-  div.dataset.match = '1';
-  return div;
-}
-
-function renderProgress(div, entry, search) {
-  div.className = 'entry progress-entry';
-  const data = entry.data || {};
-  const parts = [data.type || 'progress'];
-  if (data.command) parts.push(truncate(data.command, 100));
-  if (data.hookName) parts.push(`hook: ${data.hookName}`);
-  const text = parts.join(' — ');
-  if (search && !text.toLowerCase().includes(search)) { div.dataset.match = ''; return div; }
-  div.textContent = text;
-  div.dataset.match = '1';
-  return div;
-}
-
-function renderSnapshot(div, entry) {
-  div.className = 'entry snapshot-entry';
-  const snap = entry.snapshot || {};
-  const files = Object.keys(snap.trackedFileBackups || {});
-  div.textContent = `📸 file snapshot — ${files.length} file(s) tracked`;
-  div.dataset.match = '1';
-  return div;
-}
-
-function renderLastPrompt(div, entry, search) {
-  div.className = 'entry system-entry';
-  const text = entry.lastPrompt || '';
-  if (search && !text.toLowerCase().includes(search)) { div.dataset.match = ''; return div; }
-  div.innerHTML = `<div class="entry-header"><span class="role">Last Prompt</span></div><div class="text-content">${esc(truncate(text, 500))}</div>`;
-  div.dataset.match = '1';
-  return div;
-}
-
-// --- Helpers ---
-
-function formatToolInput(name, input) {
-  switch (name) {
-    case 'Bash': return input.command || JSON.stringify(input, null, 2);
-    case 'Read': return input.file_path || JSON.stringify(input, null, 2);
-    case 'Write': return `${input.file_path || ''}\n---\n${truncate(input.content || '', 3000)}`;
-    case 'Edit': return `${input.file_path || ''}\n--- old ---\n${input.old_string || ''}\n--- new ---\n${input.new_string || ''}`;
-    case 'Grep': return `pattern: ${input.pattern || ''}${input.path ? '  path: ' + input.path : ''}${input.glob ? '  glob: ' + input.glob : ''}`;
-    case 'Glob': return `pattern: ${input.pattern || ''}${input.path ? '  path: ' + input.path : ''}`;
-    case 'Agent': return `[${input.subagent_type || 'general'}] ${input.prompt || ''}`;
-    default: return JSON.stringify(input, null, 2);
-  }
-}
-
-function toolSummary(name, input) {
-  switch (name) {
-    case 'Bash': return truncate(input.command || '', 60);
-    case 'Read': return shortPath(input.file_path || '');
-    case 'Write': return shortPath(input.file_path || '');
-    case 'Edit': return shortPath(input.file_path || '');
-    case 'Grep': return input.pattern || '';
-    case 'Glob': return input.pattern || '';
-    case 'Agent': return input.description || truncate(input.prompt || '', 50);
-    default: return '';
-  }
-}
-
-function shortPath(p) {
-  const parts = p.replace(/\\/g, '/').split('/');
-  return parts.length > 3 ? '…/' + parts.slice(-3).join('/') : p;
-}
-
-function toggleBlock(id, headerEl) {
-  const body = document.getElementById(id);
-  if (!body) return;
-  body.classList.toggle('open');
-  const chev = headerEl.querySelector('.chevron');
-  if (chev) chev.classList.toggle('open');
-}
-// Expose globally for onclick handlers
-window.toggleBlock = toggleBlock;
-
-function esc(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
-
-function highlight(html, term) {
-  if (!term) return html;
-  const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-  return html.replace(regex, '<mark>$1</mark>');
-}
-
-function truncate(s, max) {
-  return s.length > max ? s.slice(0, max) + '…' : s;
-}
-
-function fmtTime(ts) {
-  if (!ts) return '';
-  try {
-    const d = new Date(ts);
-    return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  } catch { return ts; }
-}
-
-function debounce(fn, ms) {
-  let t;
-  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-}
+// Landing page theme button
+$('#btn-theme-landing').textContent = ChatViewer.state.theme === 'dark' ? '☀️' : '🌙';
+$('#btn-theme-landing').onclick = function() {
+  ChatViewer.ui.toggleTheme();
+};
 </script>
 </body>
 </html>
