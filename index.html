@@ -1,1322 +1,195 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Claude Code Conversation Viewer</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism-tomorrow.min.css" onerror="this.disabled=true">
-<style>
-  :root {
-    --bg: #0d1117;
-    --surface: #161b22;
-    --surface2: #1c2333;
-    --border: #30363d;
-    --text: #e6edf3;
-    --text-muted: #8b949e;
-    --user-accent: #58a6ff;
-    --assistant-accent: #d2a8ff;
-    --tool-accent: #7ee787;
-    --thinking-accent: #f0883e;
-    --system-accent: #f778ba;
-    --progress-accent: #636c76;
-    --code-bg: #0d1117;
-    --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
-    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-  }
-
-  [data-theme="light"] {
-    --bg: #ffffff;
-    --surface: #f6f8fa;
-    --surface2: #eef1f5;
-    --border: #d0d7de;
-    --text: #1f2328;
-    --text-muted: #656d76;
-    --user-accent: #0969da;
-    --assistant-accent: #8250df;
-    --tool-accent: #1a7f37;
-    --thinking-accent: #bc4c00;
-    --system-accent: #bf3989;
-    --progress-accent: #afb8c1;
-    --code-bg: #f6f8fa;
-  }
-
-  [data-theme="light"] code[class*="language-"],
-  [data-theme="light"] pre[class*="language-"] {
-    color: #1f2328;
-    background: #f6f8fa;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    font-family: var(--font-sans);
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-  }
-
-  /* Landing / drop zone */
-  #landing {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    gap: 20px;
-  }
-  #landing h1 { font-size: 1.6rem; font-weight: 600; }
-  #landing p { color: var(--text-muted); font-size: 0.9rem; }
-
-  #drop-zone {
-    width: 500px;
-    max-width: 90vw;
-    height: 200px;
-    border: 2px dashed var(--border);
-    border-radius: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: border-color 0.2s, background 0.2s;
-    gap: 12px;
-  }
-  #drop-zone:hover, #drop-zone.dragover {
-    border-color: var(--user-accent);
-    background: rgba(88, 166, 255, 0.05);
-  }
-  #drop-zone svg { opacity: 0.5; }
-  #drop-zone span { color: var(--text-muted); font-size: 0.95rem; }
-  #file-input { display: none; }
-
-  /* Header bar */
-  #header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 10px 20px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  #header .title {
-    font-weight: 600;
-    font-size: 0.95rem;
-    white-space: nowrap;
-  }
-  #header .meta {
-    color: var(--text-muted);
-    font-size: 0.8rem;
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  #header .meta span { white-space: nowrap; }
-  #header .actions { margin-left: auto; display: flex; gap: 8px; }
-
-  .btn {
-    background: var(--surface2);
-    color: var(--text);
-    border: 1px solid var(--border);
-    padding: 5px 12px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  .btn:hover { background: var(--border); }
-  .btn.active { background: var(--user-accent); color: #000; border-color: var(--user-accent); }
-
-  /* Filter bar */
-  #filters {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 8px 20px;
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  #filters label {
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    cursor: pointer;
-  }
-  #filters input[type="checkbox"] { accent-color: var(--user-accent); }
-  #search-box {
-    margin-left: auto;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    width: 220px;
-  }
-  #search-box::placeholder { color: var(--text-muted); }
-
-  /* Phase 6: Search navigation */
-  mark.active-match { background: rgba(255, 200, 50, 0.6); outline: 2px solid rgba(255, 200, 50, 0.8); border-radius: 2px; }
-  #search-nav .btn { padding: 2px 8px; font-size: 0.75rem; }
-
-  /* Phase 7: Main layout and sidebar */
-  #main-layout { display: flex; }
-  #sidebar {
-    width: 0;
-    overflow: hidden;
-    transition: width 0.2s ease;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    position: sticky;
-    top: 85px;
-    height: calc(100vh - 85px);
-    flex-shrink: 0;
-  }
-  #sidebar.sidebar-open {
-    width: 280px;
-    overflow-y: auto;
-  }
-  #sidebar-content { padding: 8px; }
-  .toc-item {
-    padding: 6px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.75rem;
-    border-left: 2px solid transparent;
-    margin-bottom: 2px;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    transition: background 0.1s;
-  }
-  .toc-item:hover { background: var(--surface2); }
-  .toc-item .toc-role {
-    font-weight: 700;
-    text-transform: uppercase;
-    font-size: 0.65rem;
-    letter-spacing: 0.5px;
-  }
-  .toc-item.toc-user { border-left-color: var(--user-accent); }
-  .toc-item.toc-user .toc-role { color: var(--user-accent); }
-  .toc-item.toc-assistant { border-left-color: var(--assistant-accent); }
-  .toc-item.toc-assistant .toc-role { color: var(--assistant-accent); }
-  .toc-item.toc-system { border-left-color: var(--system-accent); }
-  .toc-item.toc-system .toc-role { color: var(--system-accent); }
-  .toc-item .toc-preview {
-    color: var(--text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 250px;
-  }
-  .toc-item .toc-time {
-    color: var(--text-muted);
-    font-size: 0.65rem;
-  }
-
-  @media (max-width: 768px) {
-    #sidebar.sidebar-open {
-      position: fixed;
-      top: 0;
-      left: 0;
-      height: 100vh;
-      z-index: 200;
-      width: 280px;
-    }
-  }
-
-  /* Conversation container */
-  #conversation {
-    flex: 1;
-    min-width: 0;
-    max-width: 960px;
-    margin: 0 auto;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  /* Message bubbles */
-  .entry {
-    border-radius: 10px;
-    padding: 14px 18px;
-    position: relative;
-    font-size: 0.9rem;
-    overflow-wrap: break-word;
-  }
-  .entry.user {
-    background: var(--surface);
-    border-left: 3px solid var(--user-accent);
-  }
-  .entry.assistant {
-    background: var(--surface2);
-    border-left: 3px solid var(--assistant-accent);
-  }
-  .entry.system-entry {
-    background: transparent;
-    border-left: 3px solid var(--system-accent);
-    opacity: 0.7;
-    font-size: 0.8rem;
-  }
-  .entry.progress-entry {
-    background: transparent;
-    border-left: 2px solid var(--progress-accent);
-    opacity: 0.5;
-    font-size: 0.78rem;
-    padding: 6px 14px;
-  }
-  .entry.snapshot-entry {
-    background: transparent;
-    border-left: 2px solid var(--progress-accent);
-    opacity: 0.4;
-    font-size: 0.78rem;
-    padding: 4px 14px;
-  }
-
-  .entry-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
-    font-size: 0.78rem;
-    color: var(--text-muted);
-  }
-  .entry-header .role {
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-size: 0.72rem;
-  }
-  .entry.user .role { color: var(--user-accent); }
-  .entry.assistant .role { color: var(--assistant-accent); }
-  .entry.system-entry .role { color: var(--system-accent); }
-
-  .model-badge {
-    background: rgba(210, 168, 255, 0.15);
-    color: var(--assistant-accent);
-    padding: 1px 7px;
-    border-radius: 4px;
-    font-size: 0.7rem;
-  }
-
-  /* Content rendering */
-  .text-content {
-    white-space: pre-wrap;
-    word-break: break-word;
-    line-height: 1.65;
-  }
-
-  /* Markdown content */
-  .md-content { line-height: 1.7; }
-  .md-content h1, .md-content h2, .md-content h3, .md-content h4 { margin: 0.8em 0 0.4em; font-weight: 600; }
-  .md-content h1 { font-size: 1.3em; } .md-content h2 { font-size: 1.15em; } .md-content h3 { font-size: 1.05em; }
-  .md-content code { background: var(--code-bg); padding: 2px 5px; border-radius: 3px; font-family: var(--font-mono); font-size: 0.85em; }
-  .md-content pre { background: var(--code-bg); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 8px 0; }
-  .md-content pre code { background: none; padding: 0; font-size: 0.82rem; }
-  .md-content a { color: var(--user-accent); text-decoration: underline; }
-  .md-content ul, .md-content ol { padding-left: 1.5em; margin: 0.5em 0; }
-  .md-content blockquote { border-left: 3px solid var(--border); padding-left: 12px; color: var(--text-muted); margin: 0.5em 0; }
-  .md-content table { border-collapse: collapse; margin: 8px 0; width: 100%; }
-  .md-content th, .md-content td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
-  .md-content th { background: var(--surface); }
-  .md-content p { margin: 0.4em 0; }
-  .md-content li { margin: 0.2em 0; }
-
-  .thinking-block {
-    background: rgba(240, 136, 62, 0.08);
-    border: 1px solid rgba(240, 136, 62, 0.2);
-    border-radius: 6px;
-    margin: 8px 0;
-    overflow: hidden;
-  }
-  .thinking-header {
-    padding: 6px 12px;
-    font-size: 0.78rem;
-    color: var(--thinking-accent);
-    cursor: pointer;
-    user-select: none;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .thinking-header:hover { background: rgba(240, 136, 62, 0.05); }
-  .thinking-body {
-    padding: 8px 12px;
-    font-size: 0.82rem;
-    color: var(--text-muted);
-    white-space: pre-wrap;
-    word-break: break-word;
-    border-top: 1px solid rgba(240, 136, 62, 0.15);
-    display: none;
-    max-height: 500px;
-    overflow-y: auto;
-  }
-  .thinking-body.open { display: block; }
-
-  .tool-block {
-    background: rgba(126, 231, 135, 0.06);
-    border: 1px solid rgba(126, 231, 135, 0.18);
-    border-radius: 6px;
-    margin: 8px 0;
-    overflow: hidden;
-  }
-  .tool-header {
-    padding: 6px 12px;
-    font-size: 0.78rem;
-    color: var(--tool-accent);
-    cursor: pointer;
-    user-select: none;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .tool-header:hover { background: rgba(126, 231, 135, 0.04); }
-  .tool-name {
-    font-weight: 600;
-    font-family: var(--font-mono);
-  }
-  .tool-body {
-    border-top: 1px solid rgba(126, 231, 135, 0.12);
-    display: none;
-    max-height: 600px;
-    overflow-y: auto;
-  }
-  .tool-body.open { display: block; }
-  .tool-input, .tool-result-content {
-    padding: 8px 12px;
-    font-family: var(--font-mono);
-    font-size: 0.78rem;
-    white-space: pre-wrap;
-    word-break: break-word;
-    color: var(--text-muted);
-  }
-  .tool-input { background: var(--code-bg); }
-  .tool-result-content {
-    background: rgba(0,0,0,0.2);
-    border-top: 1px dashed var(--border);
-  }
-  .tool-result-label {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    padding: 4px 12px 0;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  /* Token usage bar */
-  .usage-bar {
-    margin-top: 8px;
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-  .usage-bar span { white-space: nowrap; }
-
-  /* Chevron */
-  .chevron {
-    display: inline-block;
-    transition: transform 0.15s;
-    font-size: 0.7rem;
-  }
-  .chevron.open { transform: rotate(90deg); }
-
-  /* Search highlight */
-  mark {
-    background: rgba(88, 166, 255, 0.3);
-    color: inherit;
-    border-radius: 2px;
-    padding: 0 1px;
-  }
-
-  /* Show full button (Phase 5) */
-  .show-full-btn { margin-left: 8px; font-size: 0.7rem; padding: 1px 6px; vertical-align: middle; }
-
-  /* Phase 8: Date separators and time deltas */
-  .date-separator {
-    text-align: center;
-    padding: 16px 0 8px;
-  }
-  .date-separator span {
-    background: var(--surface);
-    padding: 4px 14px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    border: 1px solid var(--border);
-  }
-  .time-delta {
-    color: var(--text-muted);
-    font-size: 0.7rem;
-    font-style: italic;
-    opacity: 0.8;
-  }
-
-  /* Phase 9: Inline images */
-  .inline-image {
-    max-width: 100%;
-    max-height: 400px;
-    border-radius: 6px;
-    margin: 8px 0;
-    display: block;
-  }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Code Explorer</title>
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/shell.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/vendor/prism.css">
 </head>
 <body>
 
-<div id="landing">
-  <h1>Claude Code Conversation Viewer</h1>
-  <p>Load any .jsonl conversation file exported from Claude Code</p>
-  <div id="drop-zone" onclick="document.getElementById('file-input').click()">
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-    </svg>
-    <span>Drop .jsonl file here or click to browse</span>
-  </div>
-  <button class="btn" id="btn-theme-landing" title="Toggle light/dark theme" style="margin-top:8px">☀️</button>
-  <input type="file" id="file-input" accept=".jsonl">
-</div>
-
-<div id="app" style="display:none;">
-  <div id="header">
-    <span class="title" id="file-name"></span>
-    <div class="meta" id="session-meta"></div>
-    <div class="actions">
-      <button class="btn" id="btn-sidebar" title="Toggle conversation outline">☰ TOC</button>
-      <button class="btn" id="btn-theme" title="Toggle light/dark theme">☀️</button>
-      <button class="btn" id="btn-expand-all" title="Expand all tool/thinking blocks">Expand All</button>
-      <button class="btn" id="btn-collapse-all" title="Collapse all tool/thinking blocks">Collapse All</button>
-      <button class="btn" id="btn-new-file">Load Another</button>
+<!-- ====================================================
+     Connect screen
+     ===================================================== -->
+<div id="connect" class="connect-screen">
+  <div class="connect-card">
+    <div class="connect-logo">
+      <div class="connect-logo-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+      </div>
+      <div class="connect-logo-wordmark">
+        Claude Code Explorer
+        <span>v0.1 — local only</span>
+      </div>
     </div>
-  </div>
-  <div id="filters">
-    <label><input type="checkbox" data-filter="user" checked> User</label>
-    <label><input type="checkbox" data-filter="assistant" checked> Assistant</label>
-    <label><input type="checkbox" data-filter="system" checked> System</label>
-    <label><input type="checkbox" data-filter="progress"> Progress</label>
-    <label><input type="checkbox" data-filter="file-history-snapshot"> Snapshots</label>
-    <input type="text" id="search-box" placeholder="Search messages…">
-    <span id="search-nav" style="display:none;align-items:center;gap:4px;">
-      <span id="search-count" style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap;"></span>
-      <button class="btn" id="btn-search-prev" title="Previous match (Shift+Enter)">▲</button>
-      <button class="btn" id="btn-search-next" title="Next match (Enter)">▼</button>
-    </span>
-  </div>
-  <div id="main-layout">
-    <aside id="sidebar" class="sidebar-closed">
-      <div id="sidebar-content"></div>
-    </aside>
-    <div id="conversation"></div>
+
+    <h1>Browse your Claude<br>sessions &amp; data</h1>
+    <p class="connect-subtitle">
+      Point Explorer at your <code>~/.claude</code> folder to browse chat sessions, plans, skills, hooks, memory files, and usage stats — all in one place.
+    </p>
+
+    <div class="feature-pills">
+      <span class="pill blue">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Sessions
+      </span>
+      <span class="pill purple">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Usage &amp; Cost
+      </span>
+      <span class="pill green">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        Skills &amp; Hooks
+      </span>
+      <span class="pill">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Memory
+      </span>
+      <span class="pill">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Plans
+      </span>
+    </div>
+
+    <button id="btn-connect" class="btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+      </svg>
+      Choose ~/.claude folder
+    </button>
+
+    <button class="btn-secondary">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      Open a single .jsonl file instead
+    </button>
+
+    <div class="privacy-note">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      <p><strong>Everything stays on your machine.</strong> Explorer reads files locally — no data is uploaded, no network requests are made, no analytics are collected.</p>
+    </div>
+
+    <p class="browser-note">
+      <strong>Chrome &amp; Edge</strong> can remember your folder across sessions.<br>
+      Safari requires re-selecting each time.
+    </p>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js" onerror="window.__markedFailed=true"></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1/prism.min.js" onerror="window.__prismFailed=true"></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-python.min.js" onerror=""></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js" onerror=""></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js" onerror=""></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-typescript.min.js" onerror=""></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-javascript.min.js" onerror=""></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-css.min.js" onerror=""></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-markup.min.js" onerror=""></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-yaml.min.js" onerror=""></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-rust.min.js" onerror=""></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-go.min.js" onerror=""></script>
-<script>
-// Disable Prism's auto-highlighting
-if (window.Prism) window.Prism.manual = true;
-
-// Top-level convenience aliases
-const $ = s => document.querySelector(s);
-const $$ = s => document.querySelectorAll(s);
-
-const ChatViewer = {
-  // --- State ---
-  state: {
-    allEntries: [],
-    toolResults: {},
-    searchIndex: 0,
-    searchMatches: [],
-    theme: 'dark',
-    sidebarOpen: false,
-  },
-
-  // --- IO: file loading and preprocessing ---
-  io: {
-    loadFile: function(file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const lines = reader.result.split('\n').filter(l => l.trim());
-        ChatViewer.state.allEntries = [];
-        ChatViewer.state.toolResults = {};
-        for (const line of lines) {
-          try { ChatViewer.state.allEntries.push(JSON.parse(line)); } catch {}
-        }
-        ChatViewer.io.preprocessToolResults();
-        ChatViewer.render.showApp(file.name);
-      };
-      reader.readAsText(file);
-    },
-
-    preprocessToolResults: function() {
-      const allEntries = ChatViewer.state.allEntries;
-      const toolResults = ChatViewer.state.toolResults;
-
-      for (const entry of allEntries) {
-        if (entry.type === 'user' && entry.toolUseResult !== undefined) {
-          toolResults['user:' + entry.uuid] = entry.toolUseResult;
-        }
-        if (entry.type === 'user' && entry.message?.content && Array.isArray(entry.message.content)) {
-          for (const block of entry.message.content) {
-            if (block.type === 'tool_result' && block.tool_use_id) {
-              toolResults[block.tool_use_id] = block.content || block;
-            }
-          }
-        }
-      }
-
-      for (const entry of allEntries) {
-        if (entry.type === 'assistant' && entry.message?.content) {
-          for (const block of entry.message.content) {
-            if (block.type === 'tool_result' && block.tool_use_id) {
-              toolResults[block.tool_use_id] = block.content || block;
-            }
-          }
-        }
-      }
-
-      const assistantById = {};
-      for (const entry of allEntries) {
-        if (entry.type === 'assistant') assistantById[entry.uuid] = entry;
-      }
-      for (const entry of allEntries) {
-        if (entry.type === 'user' && entry.sourceToolAssistantUUID && entry.toolUseResult !== undefined) {
-          const assistantEntry = assistantById[entry.sourceToolAssistantUUID];
-          if (assistantEntry?.message?.content) {
-            for (const block of assistantEntry.message.content) {
-              if (block.type === 'tool_use') {
-                toolResults[block.id] = entry.toolUseResult;
-              }
-            }
-          }
-        }
-      }
-    },
-  },
-
-  // --- Render: display logic ---
-  render: {
-    showApp: function(fileName) {
-      $('#landing').style.display = 'none';
-      $('#app').style.display = '';
-      $('#file-name').textContent = fileName;
-
-      const allEntries = ChatViewer.state.allEntries;
-      const sessionId = allEntries.find(e => e.sessionId)?.sessionId || '';
-      const branch = allEntries.find(e => e.gitBranch)?.gitBranch || '';
-      const version = allEntries.find(e => e.version)?.version || '';
-      const slug = allEntries.find(e => e.slug)?.slug || '';
-      const counts = {};
-      for (const e of allEntries) counts[e.type] = (counts[e.type] || 0) + 1;
-      const countStr = Object.entries(counts).map(([k,v]) => `${k}: ${v}`).join(', ');
-
-      // Phase 10: Calculate total session cost
-      let totalCost = 0;
-      for (const e of allEntries) {
-        if (e.type === 'assistant' && e.message?.usage) {
-          totalCost += ChatViewer.format.estimateCost(e.message.model || '', e.message.usage);
-        }
-      }
-
-      $('#session-meta').innerHTML = [
-        slug && `<span title="Session slug">${ChatViewer.util.esc(slug)}</span>`,
-        branch && `<span>branch: ${ChatViewer.util.esc(branch)}</span>`,
-        version && `<span>v${ChatViewer.util.esc(version)}</span>`,
-        `<span>${allEntries.length} entries (${countStr})</span>`,
-        totalCost > 0 && `<span>Est. cost: $${totalCost.toFixed(2)}</span>`,
-      ].filter(Boolean).join('');
-
-      // Sync theme button text in header
-      $('#btn-theme').textContent = ChatViewer.state.theme === 'dark' ? '☀️' : '🌙';
-
-      ChatViewer.render.render();
-      ChatViewer.ui.bindEvents();
-    },
-
-    render: function() {
-      const filters = new Set();
-      for (const cb of $$('#filters input[type=checkbox]')) {
-        if (cb.checked) filters.add(cb.dataset.filter);
-      }
-      const search = $('#search-box').value.trim().toLowerCase();
-      const conv = $('#conversation');
-      conv.innerHTML = '';
-
-      let entryIdx = 0;
-      let lastDateStr = '';
-      let lastTimestamp = null;
-      for (const entry of ChatViewer.state.allEntries) {
-        if (!filters.has(entry.type)) {
-          if (entry.type === 'last-prompt' && !filters.has('system')) continue;
-          if (entry.type !== 'last-prompt') continue;
-        }
-
-        if (entry.type === 'user' && entry.toolUseResult !== undefined && !entry.message?.content) continue;
-        if (entry.type === 'user' && entry.toolUseResult !== undefined) {
-          const content = entry.message?.content;
-          if (typeof content === 'string' && content.trim() === '') continue;
-          if (Array.isArray(content) && content.every(b => b.type === 'tool_result')) continue;
-        }
-
-        const el = ChatViewer.render.renderEntry(entry, search, lastTimestamp);
-        if (el) {
-          if (search && !el.dataset.match) continue;
-
-          // Phase 8: Date separator
-          if (entry.timestamp) {
-            try {
-              const dateStr = new Date(entry.timestamp).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-              if (dateStr !== lastDateStr) {
-                const sep = document.createElement('div');
-                sep.className = 'date-separator';
-                sep.innerHTML = '<span>' + ChatViewer.util.esc(dateStr) + '</span>';
-                conv.appendChild(sep);
-                lastDateStr = dateStr;
-              }
-            } catch {}
-          }
-
-          el.setAttribute('data-entry-idx', entryIdx);
-          conv.appendChild(el);
-          entryIdx++;
-          // Update lastTimestamp after rendering
-          if (entry.timestamp) lastTimestamp = entry.timestamp;
-        }
-      }
-
-      // Phase 6: Update search navigation after render
-      if (search) {
-        ChatViewer.ui.updateSearchNav();
-      } else {
-        $('#search-nav').style.display = 'none';
-        ChatViewer.state.searchMatches = [];
-      }
-
-      // Phase 7: Build sidebar TOC after render
-      ChatViewer.ui.buildSidebar();
-    },
-
-    renderEntry: function(entry, search, lastTimestamp) {
-      const div = document.createElement('div');
-
-      switch (entry.type) {
-        case 'user': return ChatViewer.render.renderUser(div, entry, search, lastTimestamp);
-        case 'assistant': return ChatViewer.render.renderAssistant(div, entry, search, lastTimestamp);
-        case 'system': return ChatViewer.render.renderSystem(div, entry, search, lastTimestamp);
-        case 'progress': return ChatViewer.render.renderProgress(div, entry, search);
-        case 'file-history-snapshot': return ChatViewer.render.renderSnapshot(div, entry);
-        case 'last-prompt': return ChatViewer.render.renderLastPrompt(div, entry, search);
-        default: return null;
-      }
-    },
-
-    renderUser: function(div, entry, search, lastTimestamp) {
-      div.className = 'entry user';
-      const content = entry.message?.content;
-      const text = typeof content === 'string' ? content : (Array.isArray(content)
-        ? content.filter(b => b.type === 'text').map(b => b.text).join('\n')
-        : JSON.stringify(content));
-
-      if (search && !text.toLowerCase().includes(search)) return (div.dataset.match = '', div);
-
-      const ts = ChatViewer.util.fmtTime(entry.timestamp);
-      const delta = ChatViewer.util.relativeTimeDelta(lastTimestamp, entry.timestamp);
-      const deltaHtml = delta ? ' <span class="time-delta">' + ChatViewer.util.esc(delta) + '</span>' : '';
-
-      // Phase 9: Check for image blocks
-      let imageHtml = '';
-      if (Array.isArray(content)) {
-        for (const block of content) {
-          if (block.type === 'image') {
-            const src = block.source?.type === 'base64'
-              ? 'data:' + (block.source.media_type || 'image/png') + ';base64,' + block.source.data
-              : (block.source?.url || '');
-            if (src) {
-              imageHtml += '<img class="inline-image" src="' + src + '" alt="User image">';
-            }
-          }
-        }
-      }
-
-      div.innerHTML = `
-        <div class="entry-header">
-          <span class="role">User</span>
-          <span>${ts}</span>${deltaHtml}
+<!-- ====================================================
+     App shell (hidden until connected)
+     ===================================================== -->
+<div id="app" class="app" style="display:none">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-row">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <path d="M9 22V12h6v10"/>
+          </svg>
         </div>
-        <div class="text-content">${search ? ChatViewer.util.highlight(ChatViewer.util.esc(text), search) : ChatViewer.util.esc(text)}</div>
-        ${imageHtml}
-      `;
-      div.dataset.match = '1';
-      return div;
-    },
+        <div>
+          <div class="brand-name">Claude <em>Explorer</em></div>
+        </div>
+      </div>
+      <div class="brand-path"><span class="dot"></span>~/.claude</div>
+    </div>
 
-    renderAssistant: function(div, entry, search, lastTimestamp) {
-      div.className = 'entry assistant';
-      const msg = entry.message || {};
-      const blocks = msg.content || [];
-      const ts = ChatViewer.util.fmtTime(entry.timestamp);
-      const model = msg.model || '';
-      const usage = msg.usage;
-      const esc = ChatViewer.util.esc;
-      const highlight = ChatViewer.util.highlight;
-      const truncate = ChatViewer.util.truncate;
-      const truncateWithExpand = ChatViewer.util.truncateWithExpand;
-      const renderMarkdown = ChatViewer.format.renderMarkdown;
-      const highlightCode = ChatViewer.format.highlightCode;
-      const detectLang = ChatViewer.format.detectLang;
-      const toolResults = ChatViewer.state.toolResults;
+    <nav class="nav">
+      <div class="nav-label">Browse</div>
+      <div class="nav-item active" data-hash="#/sessions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Sessions</span>
+      </div>
+      <div class="nav-item" data-hash="#/usage">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg>
+        <span>Usage</span>
+      </div>
+      <div class="nav-item" data-hash="#/plans">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span>Plans</span>
+      </div>
+      <div class="nav-item" data-hash="#/skills">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+        <span>Skills</span>
+      </div>
+      <div class="nav-item" data-hash="#/commands">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+        <span>Commands</span>
+      </div>
+      <div class="nav-item" data-hash="#/hooks">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5h11M6.5 12h11M6.5 17.5h11"/><circle cx="3" cy="6.5" r="1"/><circle cx="3" cy="12" r="1"/><circle cx="3" cy="17.5" r="1"/></svg>
+        <span>Hooks</span>
+      </div>
+      <div class="nav-item" data-hash="#/memory">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <span>Memory</span>
+      </div>
+    </nav>
 
-      const delta = ChatViewer.util.relativeTimeDelta(lastTimestamp, entry.timestamp);
-      const deltaHtml = delta ? ' <span class="time-delta">' + esc(delta) + '</span>' : '';
+    <div class="sidebar-foot">
+      <div class="nav-item" id="btn-theme">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <span>Toggle theme</span>
+      </div>
+      <div class="nav-item" id="btn-export-prefs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Export prefs</span>
+      </div>
+      <div class="nav-item" id="btn-import-prefs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span>Import prefs</span>
+      </div>
+      <input type="file" id="prefs-file" accept="application/json" style="display:none">
+    </div>
+  </aside>
 
-      let hasMatch = !search;
-      let html = `<div class="entry-header">
-        <span class="role">Assistant</span>
-        ${model ? `<span class="model-badge">${esc(model)}</span>` : ''}
-        <span>${ts}</span>${deltaHtml}
-      </div>`;
+  <!-- Main pane -->
+  <main class="main">
+    <div class="toolbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" placeholder="Search…">
+      </div>
+      <div class="spacer"></div>
+    </div>
+    <div id="view-root" class="content">
+      <!-- Views mount here -->
+    </div>
+  </main>
+</div>
 
-      for (const block of blocks) {
-        switch (block.type) {
-          case 'text': {
-            const t = block.text || '';
-            if (search && t.toLowerCase().includes(search)) hasMatch = true;
-            if (search) {
-              html += `<div class="text-content">${highlight(esc(t), search)}</div>`;
-            } else {
-              html += `<div class="md-content">${renderMarkdown(t)}</div>`;
-            }
-            break;
-          }
-          case 'thinking': {
-            const t = block.thinking || '';
-            if (!t.trim()) {
-              html += `<div class="thinking-block"><div class="thinking-header"><span class="chevron">▶</span> Thinking (empty/redacted)</div></div>`;
-            } else {
-              if (search && t.toLowerCase().includes(search)) hasMatch = true;
-              const id = 'th-' + Math.random().toString(36).slice(2, 9);
-              html += `<div class="thinking-block">
-                <div class="thinking-header" onclick="toggleBlock('${id}', this)">
-                  <span class="chevron">▶</span> Thinking (${t.length.toLocaleString()} chars)
-                </div>
-                <div class="thinking-body" id="${id}">${search ? highlight(esc(t), search) : esc(t)}</div>
-              </div>`;
-            }
-            break;
-          }
-          case 'tool_use': {
-            const name = block.name || 'unknown';
-            const input = block.input || {};
-            const inputStr = ChatViewer.format.formatToolInput(name, input);
-            const result = toolResults[block.id];
-            if (search && (inputStr.toLowerCase().includes(search) || name.toLowerCase().includes(search))) hasMatch = true;
-            const id = 'tu-' + Math.random().toString(36).slice(2, 9);
-            const summary = ChatViewer.format.toolSummary(name, input);
-            const lang = detectLang(name, input);
-            var highlightedInput;
-            if (name === 'Write' && !search && inputStr.length > 3000) {
-              const writeHeader = (input.file_path || '') + '\n---\n';
-              const writeContent = input.content || '';
-              const writeId = 'wt-' + id;
-              highlightedInput = esc(writeHeader) + truncateWithExpand(writeContent, 3000, writeId);
-            } else if (name === 'Write' && !search) {
-              highlightedInput = lang ? highlightCode(inputStr, lang) : esc(inputStr);
-            } else {
-              highlightedInput = search ? highlight(esc(inputStr), search) : (lang ? highlightCode(inputStr, lang) : esc(inputStr));
-            }
-            html += `<div class="tool-block">
-              <div class="tool-header" onclick="toggleBlock('${id}', this)">
-                <span class="chevron">▶</span>
-                <span class="tool-name">${esc(name)}</span>
-                <span style="color:var(--text-muted)">${esc(summary)}</span>
-              </div>
-              <div class="tool-body" id="${id}">
-                <div class="tool-input">${highlightedInput}</div>
-                ${result !== undefined ? `<div class="tool-result-label">Result</div><div class="tool-result-content">${truncateWithExpand(typeof result === 'string' ? result : JSON.stringify(result, null, 2), 8000, 'tr-' + id)}</div>` : ''}
-              </div>
-            </div>`;
-            break;
-          }
-          // tool_result blocks rendered inline with tool_use above
-        }
-      }
+<!-- Vendor libraries (UMD/global builds, offline-first — no CDN at runtime) -->
+<script src="assets/vendor/marked.min.js"></script>
+<script src="assets/vendor/purify.min.js"></script>
+<script src="assets/vendor/fuse.min.js"></script>
+<script src="assets/vendor/prism.min.js"></script>
+<script>if (window.Prism) Prism.manual = true;</script>
 
-      // Usage bar
-      if (usage) {
-        const parts = [];
-        if (usage.input_tokens) parts.push(`in: ${usage.input_tokens.toLocaleString()}`);
-        if (usage.output_tokens) parts.push(`out: ${usage.output_tokens.toLocaleString()}`);
-        if (usage.cache_read_input_tokens) parts.push(`cache read: ${usage.cache_read_input_tokens.toLocaleString()}`);
-        if (usage.cache_creation_input_tokens) parts.push(`cache write: ${usage.cache_creation_input_tokens.toLocaleString()}`);
-        // Phase 10: Per-turn cost
-        const cost = ChatViewer.format.estimateCost(model, usage);
-        if (cost > 0) parts.push('~$' + cost.toFixed(4));
-        if (parts.length) html += `<div class="usage-bar">${parts.map(p => `<span>${p}</span>`).join('')}</div>`;
-      }
+<!-- Modules: core first, then app.js (defines CCE.router/CCE.app), then views.
+     Views call CCE.router.register(...) at load, so app.js MUST precede them.
+     boot() still runs on DOMContentLoaded, after every script has loaded. -->
+<script src="assets/js/core/store.js"></script>
+<script src="assets/js/core/cost.js"></script>
+<script src="assets/js/core/jsonl.js"></script>
+<script src="assets/js/core/session-index.js"></script>
+<script src="assets/js/core/fsaccess.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/views/browse.js"></script>
+<script src="assets/js/views/viewer.js"></script>
+<script src="assets/js/views/dashboard.js"></script>
 
-      div.innerHTML = html;
-      div.dataset.match = hasMatch ? '1' : '';
-      return div;
-    },
-
-    renderSystem: function(div, entry, search, lastTimestamp) {
-      div.className = 'entry system-entry';
-      const subtype = entry.subtype || 'system';
-      const dur = entry.durationMs ? ` — ${(entry.durationMs / 1000).toFixed(1)}s` : '';
-      const ts = ChatViewer.util.fmtTime(entry.timestamp);
-      const text = `${subtype}${dur}`;
-      if (search && !text.toLowerCase().includes(search)) { div.dataset.match = ''; return div; }
-      const delta = ChatViewer.util.relativeTimeDelta(lastTimestamp, entry.timestamp);
-      const deltaHtml = delta ? ' <span class="time-delta">' + ChatViewer.util.esc(delta) + '</span>' : '';
-      div.innerHTML = `<div class="entry-header"><span class="role">System</span><span>${ts}</span>${deltaHtml}</div><span>${ChatViewer.util.esc(text)}</span>`;
-      div.dataset.match = '1';
-      return div;
-    },
-
-    renderProgress: function(div, entry, search) {
-      div.className = 'entry progress-entry';
-      const data = entry.data || {};
-      const parts = [data.type || 'progress'];
-      if (data.command) parts.push(ChatViewer.util.truncate(data.command, 100));
-      if (data.hookName) parts.push(`hook: ${data.hookName}`);
-      const text = parts.join(' — ');
-      if (search && !text.toLowerCase().includes(search)) { div.dataset.match = ''; return div; }
-      div.textContent = text;
-      div.dataset.match = '1';
-      return div;
-    },
-
-    renderSnapshot: function(div, entry) {
-      div.className = 'entry snapshot-entry';
-      const snap = entry.snapshot || {};
-      const files = Object.keys(snap.trackedFileBackups || {});
-      div.textContent = `📸 file snapshot — ${files.length} file(s) tracked`;
-      div.dataset.match = '1';
-      return div;
-    },
-
-    renderLastPrompt: function(div, entry, search) {
-      div.className = 'entry system-entry';
-      const text = entry.lastPrompt || '';
-      if (search && !text.toLowerCase().includes(search)) { div.dataset.match = ''; return div; }
-      const lpId = 'lp-' + Math.random().toString(36).slice(2, 9);
-      div.innerHTML = `<div class="entry-header"><span class="role">Last Prompt</span></div><div class="text-content">${ChatViewer.util.truncateWithExpand(text, 500, lpId)}</div>`;
-      div.dataset.match = '1';
-      return div;
-    },
-  },
-
-  // --- Format: tool input/output formatting ---
-  format: {
-    // Phase 10: Pricing table [input_per_1M, output_per_1M, cache_read_per_1M, cache_write_per_1M]
-    PRICING: {
-      'opus':   [15, 75, 1.5, 18.75],
-      'sonnet': [3, 15, 0.3, 3.75],
-      'haiku':  [0.8, 4, 0.08, 1],
-    },
-
-    // Phase 10: Estimate cost for a single turn
-    estimateCost: function(model, usage) {
-      if (!model || !usage) return 0;
-      const modelLower = (model || '').toLowerCase();
-      let rates = ChatViewer.format.PRICING['sonnet']; // default
-      for (const key in ChatViewer.format.PRICING) {
-        if (modelLower.includes(key)) { rates = ChatViewer.format.PRICING[key]; break; }
-      }
-      const cost = (
-        (usage.input_tokens || 0) * rates[0] +
-        (usage.output_tokens || 0) * rates[1] +
-        (usage.cache_read_input_tokens || 0) * rates[2] +
-        (usage.cache_creation_input_tokens || 0) * rates[3]
-      ) / 1000000;
-      return cost;
-    },
-
-    formatToolInput: function(name, input) {
-      const truncate = ChatViewer.util.truncate;
-      const truncateWithExpand = ChatViewer.util.truncateWithExpand;
-      switch (name) {
-        case 'Bash': return input.command || JSON.stringify(input, null, 2);
-        case 'Read': return input.file_path || JSON.stringify(input, null, 2);
-        case 'Write': return `${input.file_path || ''}\n---\n${input.content || ''}`;
-        case 'Edit': return `${input.file_path || ''}\n--- old ---\n${input.old_string || ''}\n--- new ---\n${input.new_string || ''}`;
-        case 'Grep': return `pattern: ${input.pattern || ''}${input.path ? '  path: ' + input.path : ''}${input.glob ? '  glob: ' + input.glob : ''}`;
-        case 'Glob': return `pattern: ${input.pattern || ''}${input.path ? '  path: ' + input.path : ''}`;
-        case 'Agent': return `[${input.subagent_type || 'general'}] ${input.prompt || ''}`;
-        default: return JSON.stringify(input, null, 2);
-      }
-    },
-
-    toolSummary: function(name, input) {
-      const truncate = ChatViewer.util.truncate;
-      const shortPath = ChatViewer.format.shortPath;
-      switch (name) {
-        case 'Bash': return truncate(input.command || '', 60);
-        case 'Read': return shortPath(input.file_path || '');
-        case 'Write': return shortPath(input.file_path || '');
-        case 'Edit': return shortPath(input.file_path || '');
-        case 'Grep': return input.pattern || '';
-        case 'Glob': return input.pattern || '';
-        case 'Agent': return input.description || truncate(input.prompt || '', 50);
-        default: return '';
-      }
-    },
-
-    shortPath: function(p) {
-      const parts = p.replace(/\\/g, '/').split('/');
-      return parts.length > 3 ? '…/' + parts.slice(-3).join('/') : p;
-    },
-
-    renderMarkdown: function(text) {
-      if (!window.marked) {
-        return ChatViewer.util.esc(text);
-      }
-      try {
-        const renderer = new marked.Renderer();
-        renderer.code = function(code, lang) {
-          const language = lang || '';
-          const highlighted = ChatViewer.format.highlightCode(code, language);
-          return `<pre class="code-block"><code class="language-${ChatViewer.util.esc(language)}">${highlighted}</code></pre>`;
-        };
-        const raw = marked.parse(text, { breaks: true, gfm: true, renderer: renderer });
-        return ChatViewer.format.sanitizeHtml(raw);
-      } catch (e) {
-        return ChatViewer.util.esc(text);
-      }
-    },
-
-    sanitizeHtml: function(html) {
-      const allowedTags = new Set([
-        'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'a', 'code', 'pre',
-        'ul', 'ol', 'li', 'blockquote', 'br', 'hr', 'table', 'thead', 'tbody', 'tr',
-        'th', 'td', 'span', 'div', 'img', 'mark'
-      ]);
-      // Strip disallowed tags but keep their content
-      let result = html.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*\/?>/g, function(match, tagName) {
-        const tag = tagName.toLowerCase();
-        if (!allowedTags.has(tag)) {
-          return '';
-        }
-        return match;
-      });
-      // Ensure <a> tags have target="_blank" rel="noopener"
-      result = result.replace(/<a\b([^>]*)>/g, function(match, attrs) {
-        // Remove existing target and rel attributes
-        let cleaned = attrs.replace(/\s*target\s*=\s*("[^"]*"|'[^']*'|\S+)/gi, '');
-        cleaned = cleaned.replace(/\s*rel\s*=\s*("[^"]*"|'[^']*'|\S+)/gi, '');
-        return `<a${cleaned} target="_blank" rel="noopener">`;
-      });
-      return result;
-    },
-
-    highlightCode: function(code, lang) {
-      if (window.Prism && lang && Prism.languages[lang]) {
-        return Prism.highlight(code, Prism.languages[lang], lang);
-      }
-      return ChatViewer.util.esc(code);
-    },
-
-    detectLang: function(toolName, input) {
-      if (toolName === 'Bash') return 'bash';
-      if (toolName === 'Read' || toolName === 'Write' || toolName === 'Edit') {
-        const filePath = input.file_path || '';
-        const ext = filePath.split('.').pop().toLowerCase();
-        const extMap = {
-          py: 'python', js: 'javascript', ts: 'typescript', jsx: 'javascript',
-          tsx: 'typescript', json: 'json', rs: 'rust', go: 'go', html: 'markup',
-          css: 'css', rb: 'ruby', sh: 'bash', yml: 'yaml', yaml: 'yaml', md: 'markdown'
-        };
-        return extMap[ext] || '';
-      }
-      return '';
-    },
-  },
-
-  // --- UI: user interaction ---
-  ui: {
-    toggleBlock: function(id, headerEl) {
-      const body = document.getElementById(id);
-      if (!body) return;
-      body.classList.toggle('open');
-      const chev = headerEl.querySelector('.chevron');
-      if (chev) chev.classList.toggle('open');
-    },
-
-    collapseAll: function() {
-      for (const el of $$('.thinking-body.open, .tool-body.open')) el.classList.remove('open');
-      for (const el of $$('.chevron.open')) el.classList.remove('open');
-    },
-
-    expandAll: function() {
-      for (const el of $$('.thinking-body:not(.open), .tool-body:not(.open)')) el.classList.add('open');
-      for (const el of $$('.chevron:not(.open)')) el.classList.add('open');
-    },
-
-    toggleTheme: function() {
-      ChatViewer.state.theme = ChatViewer.state.theme === 'dark' ? 'light' : 'dark';
-      document.documentElement.dataset.theme = ChatViewer.state.theme;
-      var themeBtn = $('#btn-theme');
-      if (themeBtn) themeBtn.textContent = ChatViewer.state.theme === 'dark' ? '☀️' : '🌙';
-      var landingBtn = $('#btn-theme-landing');
-      if (landingBtn) landingBtn.textContent = ChatViewer.state.theme === 'dark' ? '☀️' : '🌙';
-      localStorage.setItem('cv-theme', ChatViewer.state.theme);
-    },
-
-    showFull: function(id) {
-      const trunc = document.getElementById(id + '-trunc');
-      const full = document.getElementById(id + '-full');
-      if (trunc) trunc.style.display = 'none';
-      if (full) full.style.display = 'inline';
-    },
-
-    // Phase 6: Search navigation
-    updateSearchNav: function() {
-      var marks = Array.from(document.querySelectorAll('#conversation mark'));
-      ChatViewer.state.searchMatches = marks;
-      if (marks.length === 0) {
-        $('#search-nav').style.display = 'none';
-        return;
-      }
-      $('#search-nav').style.display = 'flex';
-      // Clamp index to valid range
-      if (ChatViewer.state.searchIndex < 0) ChatViewer.state.searchIndex = 0;
-      if (ChatViewer.state.searchIndex >= marks.length) ChatViewer.state.searchIndex = marks.length - 1;
-      // Remove active-match from all
-      for (var i = 0; i < marks.length; i++) {
-        marks[i].classList.remove('active-match');
-      }
-      // Add active-match to current
-      marks[ChatViewer.state.searchIndex].classList.add('active-match');
-      $('#search-count').textContent = (ChatViewer.state.searchIndex + 1) + ' of ' + marks.length;
-      marks[ChatViewer.state.searchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
-    },
-
-    searchNext: function() {
-      if (!ChatViewer.state.searchMatches.length) return;
-      ChatViewer.state.searchIndex = (ChatViewer.state.searchIndex + 1) % ChatViewer.state.searchMatches.length;
-      ChatViewer.ui.updateSearchNav();
-    },
-
-    searchPrev: function() {
-      if (!ChatViewer.state.searchMatches.length) return;
-      ChatViewer.state.searchIndex = (ChatViewer.state.searchIndex - 1 + ChatViewer.state.searchMatches.length) % ChatViewer.state.searchMatches.length;
-      ChatViewer.ui.updateSearchNav();
-    },
-
-    // Phase 7: Sidebar TOC
-    toggleSidebar: function() {
-      const sb = $('#sidebar');
-      const isOpen = sb.classList.contains('sidebar-open');
-      sb.classList.toggle('sidebar-open', !isOpen);
-      sb.classList.toggle('sidebar-closed', isOpen);
-      ChatViewer.state.sidebarOpen = !isOpen;
-    },
-
-    buildSidebar: function() {
-      var entries = document.querySelectorAll('#conversation .entry');
-      var sidebarContent = $('#sidebar-content');
-      sidebarContent.innerHTML = '';
-
-      for (var i = 0; i < entries.length; i++) {
-        var entryEl = entries[i];
-        var role = null;
-        var roleLabel = '';
-        var tocClass = '';
-
-        if (entryEl.classList.contains('user')) {
-          role = 'user';
-          roleLabel = 'User';
-          tocClass = 'toc-user';
-        } else if (entryEl.classList.contains('assistant')) {
-          role = 'assistant';
-          roleLabel = 'Assistant';
-          tocClass = 'toc-assistant';
-        } else {
-          // Skip system, progress, snapshot entries
-          continue;
-        }
-
-        // Extract preview text
-        var previewEl = entryEl.querySelector('.text-content') || entryEl.querySelector('.md-content');
-        var previewText = '';
-        if (previewEl) {
-          previewText = previewEl.textContent.slice(0, 50).trim();
-        }
-        if (!previewText) {
-          previewText = entryEl.textContent.slice(0, 50).trim();
-        }
-
-        // Get timestamp from entry header
-        var headerSpans = entryEl.querySelectorAll('.entry-header span');
-        var timeText = '';
-        if (headerSpans.length >= 2) {
-          timeText = headerSpans[headerSpans.length - 1].textContent;
-        }
-
-        // Create TOC item
-        var tocItem = document.createElement('div');
-        tocItem.className = 'toc-item ' + tocClass;
-        tocItem.setAttribute('data-entry-idx', entryEl.getAttribute('data-entry-idx'));
-
-        var innerHtml = '<span class="toc-role">' + ChatViewer.util.esc(roleLabel) + '</span>';
-        innerHtml += '<span class="toc-preview">' + ChatViewer.util.esc(previewText) + '</span>';
-        if (timeText) {
-          innerHtml += '<span class="toc-time">' + ChatViewer.util.esc(timeText) + '</span>';
-        }
-        tocItem.innerHTML = innerHtml;
-
-        // Click handler to scroll to entry
-        (function(targetEl) {
-          tocItem.addEventListener('click', function() {
-            targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          });
-        })(entryEl);
-
-        sidebarContent.appendChild(tocItem);
-      }
-    },
-
-    bindEvents: function() {
-      for (const cb of $$('#filters input[type=checkbox]')) {
-        cb.onchange = ChatViewer.render.render;
-      }
-      $('#search-box').oninput = ChatViewer.util.debounce(ChatViewer.render.render, 200);
-      $('#btn-collapse-all').onclick = ChatViewer.ui.collapseAll;
-      $('#btn-expand-all').onclick = ChatViewer.ui.expandAll;
-      $('#btn-theme').onclick = ChatViewer.ui.toggleTheme;
-
-      // Phase 6: Search navigation bindings
-      $('#btn-search-next').onclick = ChatViewer.ui.searchNext;
-      $('#btn-search-prev').onclick = ChatViewer.ui.searchPrev;
-      $('#search-box').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          if (e.shiftKey) ChatViewer.ui.searchPrev();
-          else ChatViewer.ui.searchNext();
-        }
-      });
-
-      // Phase 7: Sidebar toggle binding
-      $('#btn-sidebar').onclick = ChatViewer.ui.toggleSidebar;
-    },
-  },
-
-  // --- Util: pure helpers ---
-  util: {
-    $: $,
-    $$: $$,
-
-    esc: function(s) {
-      const d = document.createElement('div');
-      d.textContent = s;
-      return d.innerHTML;
-    },
-
-    highlight: function(html, term) {
-      if (!term) return html;
-      const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-      return html.replace(regex, '<mark>$1</mark>');
-    },
-
-    truncate: function(s, max) {
-      return s.length > max ? s.slice(0, max) + '…' : s;
-    },
-
-    truncateWithExpand: function(text, max, id) {
-      if (text.length <= max) return ChatViewer.util.esc(text);
-      var truncId = id + '-trunc';
-      var fullId = id + '-full';
-      return ChatViewer.util.esc(text.slice(0, max)) +
-        '<span id="' + truncId + '">…<button class="btn show-full-btn" onclick="ChatViewer.ui.showFull(\'' + id + '\')">Show full (' + (text.length / 1024).toFixed(1) + 'KB)</button></span>' +
-        '<span id="' + fullId + '" style="display:none">' + ChatViewer.util.esc(text.slice(max)) + '</span>';
-    },
-
-    fmtTime: function(ts) {
-      if (!ts) return '';
-      try {
-        const d = new Date(ts);
-        return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      } catch { return ts; }
-    },
-
-    // Phase 8: Relative time delta between two timestamps
-    relativeTimeDelta: function(prev, curr) {
-      if (!prev || !curr) return '';
-      const diff = new Date(curr) - new Date(prev);
-      if (diff < 60000) return '';  // < 1 min
-      if (diff < 3600000) return Math.round(diff / 60000) + ' min later';
-      if (diff < 86400000) return Math.round(diff / 3600000) + 'h later';
-      return Math.round(diff / 86400000) + 'd later';
-    },
-
-    debounce: function(fn, ms) {
-      let t;
-      return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-    },
-  },
-};
-
-// Ensure ChatViewer is accessible from onclick handlers
-window.ChatViewer = ChatViewer;
-
-// Expose toggleBlock globally for inline onclick handlers
-window.toggleBlock = ChatViewer.ui.toggleBlock;
-
-// --- Theme initialization (load saved theme early) ---
-(function() {
-  var saved = localStorage.getItem('cv-theme');
-  if (saved) {
-    ChatViewer.state.theme = saved;
-    document.documentElement.dataset.theme = saved;
-  }
-})();
-
-// --- File loading event bindings (landing page) ---
-const dropZone = $('#drop-zone');
-const fileInput = $('#file-input');
-
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('dragover');
-  if (e.dataTransfer.files.length) ChatViewer.io.loadFile(e.dataTransfer.files[0]);
-});
-fileInput.addEventListener('change', () => { if (fileInput.files.length) ChatViewer.io.loadFile(fileInput.files[0]); });
-$('#btn-new-file').addEventListener('click', () => {
-  $('#app').style.display = 'none';
-  $('#landing').style.display = 'flex';
-  fileInput.value = '';
-});
-
-// Landing page theme button
-$('#btn-theme-landing').textContent = ChatViewer.state.theme === 'dark' ? '☀️' : '🌙';
-$('#btn-theme-landing').onclick = function() {
-  ChatViewer.ui.toggleTheme();
-};
-</script>
 </body>
 </html>

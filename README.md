@@ -1,162 +1,131 @@
-# Claude Code Chat Viewer
+# Claude Code Explorer
 
-A lightweight, single-file HTML viewer for browsing Claude Code conversation history. Drop in a `.jsonl` conversation file and explore the full chat — messages, tool calls, thinking blocks, token usage, cost estimates, and more.
+A local, offline, zero-install explorer for your `~/.claude` folder. Open `index.html` in a browser, pick your `~/.claude` directory once, and browse all your Claude Code sessions — no server, no npm, no build step.
 
-## Features
+## Quick Start
 
-- **Drag-and-drop** or file-picker to load `.jsonl` conversation files
-- **Markdown rendering** — Assistant responses render with proper headings, bold, italic, links, code blocks, lists, and tables (powered by marked.js with offline fallback)
-- **Syntax highlighting** — Code blocks and tool inputs are syntax-colored for 10+ languages (powered by Prism.js with offline fallback)
-- **Light & dark themes** — Toggle between dark and light modes; your choice persists across sessions
-- **Conversation sidebar (TOC)** — Collapsible outline panel showing all user/assistant turns for quick navigation
-- **Search with navigation** — Full-text search with match counter, next/prev buttons, and keyboard shortcuts (Enter / Shift+Enter)
-- **Expand/Collapse All** — Expand or collapse all tool and thinking blocks with one click
-- **"Show Full" for truncated content** — Long tool results and file contents show a "Show full" button instead of hard-truncating
-- **Cost estimation** — Per-turn and session-total cost estimates based on model and token usage
-- **Date separators & relative timestamps** — Visual date dividers and "3 min later" / "2h later" labels between messages
-- **Inline image support** — User-attached screenshots and images render inline
-- **Color-coded message types** — User (blue), Assistant (purple), System (pink), Progress (gray)
-- **Token usage stats** — Input, output, cache read/write token counts per assistant turn
-- **Filter by message type** — Toggle checkboxes for User, Assistant, System, Progress, Snapshots
-- **Zero build step** — Just one `index.html` file; CDN-enhanced but fully functional offline
+1. Double-click `index.html` (or `open index.html` from Terminal)
+2. Click **"Choose ~/.claude folder"** and select your `~/.claude` directory
+3. Browse sessions in List, Grid, or Tiles view
 
-## How to Use
+That's it. Chrome and Edge remember your folder selection via the File System Access API — future visits skip the picker. Safari and Firefox will re-prompt each time (browser limitation).
 
-### 1. Open the Viewer
+## On-Disk Layout
 
-Simply open `index.html` in any modern browser:
-
-```bash
-# macOS
-open index.html
-
-# Linux
-xdg-open index.html
-
-# Or just double-click index.html in your file manager
-```
-
-### 2. Find Your Claude Code Chat History
-
-Claude Code stores all conversation logs as `.jsonl` files inside the `.claude/` folder in your home directory:
-
-```
-~/.claude/projects/
-```
-
-Each project you've used Claude Code in gets its own subfolder. The folder name is derived from the absolute path of the project directory (with slashes replaced by dashes). Inside each project folder there is a `chat/` directory containing the conversation files.
-
-**Full path structure:**
+Claude Code stores sessions as `.jsonl` files directly inside each project subfolder:
 
 ```
 ~/.claude/
   projects/
-    -Users-yourname-Developer-my-project/     # project folder
-      chat/
-        abc123-def4-5678-abcd-ef1234567890.jsonl   # one file per session
-        ...
+    -Users-yourname-Developer-my-project/     # one folder per project
+      abc123-def4-5678-abcd-ef1234567890.jsonl  # one .jsonl file per session
+      bcd456-ef12-3456-bcde-f12345678901.jsonl
     -Users-yourname-another-project/
-      chat/
-        ...
+      ...
+  settings.json
+  CLAUDE.md
 ```
 
-### 3. Navigate to the Chat Folder
+The folder name is the absolute path of your project with slashes replaced by dashes. Sessions live **directly** in the project folder — there is no `chat/` subfolder.
 
-```bash
-# List all project folders
-ls ~/.claude/projects/
+## Features
 
-# Pick your project and list the chat files
-ls ~/.claude/projects/-Users-yourname-Developer-my-project/chat/
+### Session Browser
 
-# Tip: sort by date to find the most recent conversation
-ls -lt ~/.claude/projects/-Users-yourname-Developer-my-project/chat/ | head -20
-```
+Three views for browsing sessions — switch with the List / Grid / Tiles toggle in the header:
 
-### 4. Load the Conversation File
-
-You have two options:
-
-**Option A — Drag and drop:** Open the viewer in your browser, then drag a `.jsonl` file from Finder / file manager onto the drop zone.
-
-**Option B — Terminal shortcut:** Copy the file to a convenient location, or open the viewer and use the file picker to browse to the `.jsonl` file:
-
-```bash
-# Example: copy the latest chat file to your Desktop
-cp ~/.claude/projects/-Users-yourname-Developer-my-project/chat/LATEST_FILE.jsonl ~/Desktop/
-```
-
-Then drop it into the viewer.
-
-### 5. Navigate the Conversation
-
-Once a file is loaded, here's how to use every feature:
-
-#### Header Bar
-
-| Control | What it does |
+| View | Description |
 |---|---|
-| **TOC** | Opens/closes the sidebar table of contents |
-| **Theme toggle** (sun/moon icon) | Switches between dark and light themes |
-| **Expand All** | Opens every tool call and thinking block |
-| **Collapse All** | Closes every tool call and thinking block |
-| **Load Another** | Returns to the landing page to load a different file |
+| **List** (default) | Compact rows with date, model, turn count, cost |
+| **Grid** | Cards with a session summary excerpt |
+| **Tiles** | Dense tile layout for high-volume browsing |
 
-The header also displays session metadata: file name, git branch, CLI version, entry counts, and **estimated session cost**.
+- **Star sessions** — Click the star to favorite a session; favorites persist across browser restarts
+- **Search** — Full-text filter across session summaries and project paths
+- **Sort** — By date, cost, or turn count
+- **Project filter** — Narrow to a single project folder
 
-#### Sidebar (TOC)
+### Session Viewer
 
-Click the **TOC** button to open a left-side panel listing every user and assistant message. Each item shows the role, a short preview, and timestamp. **Click any item to scroll directly to that message.**
+Click any session to open it as a rendered conversation:
 
-#### Filtering & Search
+- **Markdown rendering** — Assistant responses rendered with headings, bold, code blocks, tables (via vendored marked.js)
+- **Syntax highlighting** — Code blocks and tool inputs colored for 15+ languages (via vendored Prism.js)
+- **Thinking blocks** — Click to expand Claude's internal reasoning chain
+- **Tool calls** — Expand to see input and result; long outputs have a "Show full" toggle
+- **Token usage** — Input / output / cache counts per assistant turn
+- **Cost per turn** — Estimated cost shown on each assistant message
+- **DOMPurify sanitization** — All HTML content sanitized before render (vendored)
 
-- **Filter checkboxes** — Toggle User, Assistant, System, Progress, and Snapshot entries on/off
-- **Search box** — Type to filter and highlight matching messages
-- **Match counter** — Shows "1 of N matches" when searching
-- **Navigation arrows** (or **Enter** / **Shift+Enter**) — Jump to the next/previous match
+### Usage Dashboard
 
-#### Message Blocks
+The **Usage** tab shows aggregated statistics across all sessions in the picked folder:
 
-- **User messages** (blue border) — Your prompts and inputs; attached images render inline
-- **Assistant messages** (purple border) — Claude's responses rendered as formatted Markdown with syntax-highlighted code blocks
-- **Thinking blocks** (orange) — Click to expand Claude's internal reasoning chain
-- **Tool calls** (green) — Click to expand and see the tool input (syntax-highlighted) and result; long results have a **"Show full"** button
-- **System entries** (pink) — Turn duration and system events
-- **Progress entries** (gray) — Streaming bash commands and hook events (hidden by default — enable via checkbox)
+- Total spend by project
+- Token usage over time
+- Model breakdown (if multiple models used)
+- Session count and average cost
 
-#### Timestamps
+## Persistence
 
-- **Date separators** appear between messages on different days
-- **Relative time** labels ("3 min later", "2h later") show the gap between consecutive messages
+Preferences are saved to `localStorage` keyed by session UUID:
 
-#### Cost & Token Usage
+| What | Stored |
+|---|---|
+| Starred / favorite sessions | Yes (per UUID) |
+| Last selected view (List/Grid/Tiles) | Yes |
+| Theme (light/dark) | Yes |
+| Folder handle | Chrome/Edge only (File System Access API) |
 
-Each assistant turn shows a usage bar with:
-- Input / output token counts
-- Cache read / write counts
-- **Estimated cost** for that turn (e.g., `~$0.0342`)
+**Export / Import prefs** — Use the settings panel to export your favorites and preferences as JSON, or import a backup. Useful when switching browsers or machines.
 
-The session total estimated cost is displayed in the header bar.
+**Safari caveat** — Safari does not persist the folder handle; you must re-pick `~/.claude` on each visit. All other prefs (stars, theme, view) persist normally via localStorage.
 
-## Offline Support
+## Offline Behavior
 
-The viewer loads **marked.js** (Markdown) and **Prism.js** (syntax highlighting) from CDN for enhanced rendering. If you're offline or the CDN is unreachable:
+All libraries are vendored locally under `assets/vendor/` — no CDN calls, no network required:
 
-- Markdown falls back to plain text display
-- Code shows as plain monospace (no colors)
-- All other features work normally
+- `marked.min.js` — Markdown rendering
+- `purify.min.js` — HTML sanitization
+- `fuse.min.js` — Fuzzy search
+- `prism.min.js` + `prism.css` — Syntax highlighting
 
-No internet connection is required for core functionality.
+The app works fully offline after first open. You can even copy the whole folder to a USB drive.
 
-## Schema
+## Browser Support
 
-The `claude-conversation.schema.json` file documents the structure of each JSONL entry type:
+| Browser | Folder memory | Notes |
+|---|---|---|
+| Chrome 86+ | Persists | Full File System Access API support |
+| Edge 86+ | Persists | Full File System Access API support |
+| Safari 15.2+ | Re-pick each time | Partial FSA support; no handle persistence |
+| Firefox | Re-pick each time | FSA not supported; picker works each time |
+
+## Legacy Viewer
+
+`index-legacy-viewer.html` is the previous single-file viewer (loads one `.jsonl` at a time via drag-and-drop or file picker). It still works if you want a quick look at a single file without picking the whole `~/.claude` folder.
+
+## Roadmap
+
+**Phase 1 (current):** Sessions, Viewer, Usage — all working offline from a picked `~/.claude`.
+
+**Placeholder tabs** (visible in UI but not yet implemented — future phases):
+- **Plans** — Browse `.claude/plans/` files
+- **Skills** — Browse `.claude/commands/` (slash command skills)
+- **Hooks** — View hook configuration from `settings.json`
+- **Memory** — Browse `CLAUDE.md` and project-level memory files
+
+**Phase 4 (planned):** `npx claude-viewer` — a localhost-only read-only server that unlocks MCP config viewing from `~/.claude.json` without requiring the browser folder picker. Will run on `localhost:3000` and auto-open the browser.
+
+## Schema Reference
+
+The `claude-conversation.schema.json` file in this repo documents every JSONL entry type:
 
 | Entry Type | Description |
 |---|---|
 | `user` | User messages and tool results |
-| `assistant` | Assistant responses (text, thinking, tool calls) |
-| `system` | System events like turn duration |
+| `assistant` | Assistant responses (text, thinking blocks, tool calls) |
+| `system` | System events (turn duration, etc.) |
 | `progress` | Streaming progress events (bash commands, hooks) |
 | `file-history-snapshot` | File backup snapshots taken during the session |
 | `last-prompt` | The last user prompt for session resumption |
@@ -164,22 +133,12 @@ The `claude-conversation.schema.json` file documents the structure of each JSONL
 ## Quick Reference
 
 ```bash
-# Where are my chats?
+# Where are your Claude Code sessions?
 ls ~/.claude/projects/
 
-# What project folders exist?
-ls ~/.claude/projects/ | head -20
+# List sessions for a specific project (they're .jsonl files directly in the folder)
+ls -lt ~/.claude/projects/-Users-$(whoami)-Developer-my-project/
 
-# Find conversations for a specific project
-ls -lt ~/.claude/projects/-Users-$(whoami)-Developer-my-project/chat/
-
-# Open the viewer
+# Open the Explorer
 open index.html
 ```
-
-## Keyboard Shortcuts
-
-| Key | Action |
-|---|---|
-| **Enter** (in search box) | Jump to next match |
-| **Shift+Enter** (in search box) | Jump to previous match |
