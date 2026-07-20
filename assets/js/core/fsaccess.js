@@ -7,7 +7,10 @@
   /* ------------------------------------------------------------------ */
   const SKIP_DIRS = new Set([
     'cache', 'backups', 'file-history', 'debug',
-    'sessions', 'session-env', 'node_modules'
+    'sessions', 'session-env', 'node_modules',
+    // 'plugins' holds many plugin-provided skills/commands we don't want to
+    // surface as the user's own; pruning it also speeds up the folder scan.
+    'plugins'
   ]);
 
   /* ------------------------------------------------------------------ */

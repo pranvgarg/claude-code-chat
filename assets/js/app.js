@@ -23,7 +23,7 @@
 
   // Placeholder views for tabs not yet built (Phase 2-3). Without these, the
   // router would fall back to the Sessions view when they are clicked.
-  ['#/plans', '#/skills', '#/commands', '#/hooks', '#/memory'].forEach(function (h) {
+  ['#/commands', '#/hooks', '#/memory'].forEach(function (h) {
     var label = h.slice(2).charAt(0).toUpperCase() + h.slice(3);
     router.register(h, {
       title: label,
