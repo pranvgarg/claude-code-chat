@@ -22,7 +22,7 @@
         }
       }
     }
-    return { id: meta.id, prompt: firstUserPrompt(entries), model, branch,
+    return { id: meta.id, projectFolder: meta.projectFolder, prompt: firstUserPrompt(entries), model, branch,
       msgs: entries.filter(e=>e.type==='user'||e.type==='assistant').length,
       cost, tokens, firstTs, lastTs };
   }
