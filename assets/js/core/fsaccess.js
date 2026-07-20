@@ -72,6 +72,50 @@
     return out;
   }
 
+  /* Pure helper: plan files stored at plans/<name>.md (direct children only) */
+  function plansFromFileList(fileList) {
+    var out = [];
+    for (var i = 0; i < fileList.length; i++) {
+      var f = fileList[i];
+      var parts = (f.webkitRelativePath || f.relPath || '').split('/');
+      var pi = parts.indexOf('plans');
+      if (pi === -1) continue;
+      var fname = f.name || parts[parts.length - 1];
+      if (!/\.md$/.test(fname)) continue;
+      // Must be a DIRECT child of the 'plans' segment: parts[pi+1] === fname, length === pi+2
+      if (parts[pi + 1] !== fname) continue;
+      if (parts.length !== pi + 2) continue;
+      out.push({ name: fname.replace(/\.md$/, ''), _file: f });
+    }
+    return out;
+  }
+
+  /* Pure helper: skill descriptors stored at skills/<name>/SKILL.md
+     Also accepts one extra namespace level: skills/<ns>/<name>/SKILL.md */
+  function skillsFromFileList(fileList) {
+    var out = [];
+    for (var i = 0; i < fileList.length; i++) {
+      var f = fileList[i];
+      var parts = (f.webkitRelativePath || f.relPath || '').split('/');
+      var pi = parts.indexOf('skills');
+      if (pi === -1) continue;
+      var fname = f.name || parts[parts.length - 1];
+      if (fname !== 'SKILL.md') continue;
+      // skills/<name>/SKILL.md  → length === pi+3, name = parts[pi+1]
+      // skills/<ns>/<name>/SKILL.md → length === pi+4, name = parts[pi+2]
+      var skillName;
+      if (parts.length === pi + 3 && parts[pi + 2] === 'SKILL.md') {
+        skillName = parts[pi + 1];
+      } else if (parts.length === pi + 4 && parts[pi + 3] === 'SKILL.md') {
+        skillName = parts[pi + 2];
+      } else {
+        continue;
+      }
+      out.push({ name: skillName, _file: f });
+    }
+    return out;
+  }
+
   /* Pure helper: subagent transcripts for one session, stored at
      projects/<projectFolder>/<sessionId>/subagents/<agent>.jsonl */
   function subagentsFromFileList(fileList, projectFolder, sessionId) {
@@ -253,6 +297,22 @@
     }));
   }
 
+  /* listPlans — plan markdown files from plans/<name>.md */
+  function listPlans() {
+    var descs = plansFromFileList(_files);
+    return Promise.resolve(descs.map(function (d) {
+      return { name: d.name, read: function () { return d._file.text(); } };
+    }));
+  }
+
+  /* listSkills — skill descriptors from skills/<name>/SKILL.md */
+  function listSkills() {
+    var descs = skillsFromFileList(_files);
+    return Promise.resolve(descs.map(function (d) {
+      return { name: d.name, read: function () { return d._file.text(); } };
+    }));
+  }
+
   /* ------------------------------------------------------------------ */
   /* Public surface                                                       */
   /* ------------------------------------------------------------------ */
@@ -261,9 +321,13 @@
     SKIP_DIRS: SKIP_DIRS,
     listSessions: listSessions,
     listSubagents: listSubagents,
+    listPlans: listPlans,
+    listSkills: listSkills,
     // Exposed for unit testing only:
     _sessionsFromFileList: sessionsFromFileList,
-    _subagentsFromFileList: subagentsFromFileList
+    _subagentsFromFileList: subagentsFromFileList,
+    _plansFromFileList: plansFromFileList,
+    _skillsFromFileList: skillsFromFileList
   };
 
   CCE.connect = {
