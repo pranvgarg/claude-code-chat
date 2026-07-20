@@ -76,24 +76,81 @@
       var listEl = root.querySelector('#doc-list');
       var bodyEl = root.querySelector('#doc-body');
 
-      /* Show active skill markdown */
-      function showSkill(rawText) {
-        bodyEl.innerHTML = '<div class="vwr-md-content">' + CCE.markdown.render(stripFrontmatter(rawText)) + '</div>';
+      /*
+       * openables[] is a flat array of { read: fn } entries keyed by
+       * data-skill-idx on each .doc-item so clicks can delegate back here.
+       */
+      var openables = [];
+
+      /* Render a skill's SKILL.md into #doc-body */
+      function openEntry(idx) {
+        var entry = openables[idx];
+        if (!entry) return;
+        bodyEl.innerHTML = 'Loading…';
+        entry.read().then(function (text) {
+          bodyEl.innerHTML =
+            '<div class="vwr-md-content">' +
+            CCE.markdown.render(stripFrontmatter(text)) +
+            '</div>';
+        }).catch(function (err) {
+          bodyEl.innerHTML =
+            '<div class="doc-empty"><h3>Error loading skill</h3><p>' +
+            CCE.markdown.esc(err && err.message ? err.message : String(err)) +
+            '</p></div>';
+        });
       }
 
-      /* 3. Load skills */
-      CCE.fsaccess.listSkills().then(function (skills) {
-        if (!skills || skills.length === 0) {
+      /* Move .active highlight to the clicked .doc-item */
+      function setActive(itemEl) {
+        listEl.querySelectorAll('.doc-item').forEach(function (el) {
+          el.classList.remove('active');
+        });
+        itemEl.classList.add('active');
+      }
+
+      /* Single delegated listener for the entire sidebar */
+      listEl.addEventListener('click', function (e) {
+        /* --- collapsible group header toggle --- */
+        var header = e.target.closest('.doc-group-header');
+        if (header) {
+          var group = header.closest('.doc-group');
+          if (group) group.classList.toggle('open');
+          return;
+        }
+
+        /* --- skill item click --- */
+        var item = e.target.closest('.doc-item');
+        if (!item) return;
+        setActive(item);
+        var idx = parseInt(item.getAttribute('data-skill-idx'), 10);
+        openEntry(idx);
+      });
+
+      /* ------------------------------------------------------------ */
+      /* Load BOTH tiers concurrently; render sidebar when ready       */
+      /* ------------------------------------------------------------ */
+      var userSkillsPromise = CCE.fsaccess.listSkills().catch(function () { return []; });
+      var pluginSkillsPromise = CCE.fsaccess.listPluginSkills().catch(function () { return []; });
+
+      Promise.all([userSkillsPromise, pluginSkillsPromise]).then(function (results) {
+        var userSkills   = results[0] || [];
+        var pluginSkills = results[1] || [];
+
+        /* Empty-state: nothing at all */
+        if (userSkills.length === 0 && pluginSkills.length === 0) {
           bodyEl.innerHTML =
             '<div class="doc-empty">' +
             '<h3>No skills</h3>' +
-            '<p>Skills in ~/.claude/skills will appear here.</p>' +
+            '<p>Skills in ~/.claude/skills and ~/.claude/plugins will appear here.</p>' +
             '</div>';
           return;
         }
 
-        /* Read all SKILL.md files concurrently */
-        var reads = skills.map(function (skill) {
+        /*
+         * We pre-read user skills (only ~13) to show name+description.
+         * Plugin skills are NOT pre-read (326 files); lazy only.
+         */
+        var userReads = userSkills.map(function (skill) {
           return skill.read()
             .then(function (text) {
               var fm = parseFrontmatter(text, skill.name);
@@ -104,42 +161,98 @@
             });
         });
 
-        Promise.all(reads).then(function (items) {
-          /* Build sidebar list */
-          var listHTML = '';
-          items.forEach(function (item, idx) {
+        Promise.all(userReads).then(function (userItems) {
+          var html = '';
+
+          /* ---- TIER 1: User Skills ---- */
+          html += '<div class="doc-section-title">User Skills (' + userItems.length + ')</div>';
+
+          var firstUserIdx = -1;
+          userItems.forEach(function (item) {
+            var entryIdx = openables.length;
+            openables.push({ read: item.skill.read.bind(item.skill) });
+
             var desc = item.fm.description;
             var descTrunc = desc.length > 90 ? desc.slice(0, 90) + '…' : desc;
-            listHTML +=
-              '<div class="doc-item' + (idx === 0 ? ' active' : '') + '" data-idx="' + idx + '">' +
-              '<strong>' + CCE.markdown.esc(item.skill.name) + '</strong>' +
+
+            if (firstUserIdx === -1) firstUserIdx = entryIdx;
+
+            html +=
+              '<div class="doc-item" data-skill-idx="' + entryIdx + '">' +
+              '<strong>' + CCE.markdown.esc(item.fm.name || item.skill.name) + '</strong>' +
               (descTrunc
                 ? '<div class="doc-item-desc">' + CCE.markdown.esc(descTrunc) + '</div>'
                 : '') +
               '</div>';
           });
-          listEl.innerHTML = listHTML;
 
-          /* Auto-render first skill */
-          if (items[0] && items[0].text) {
-            showSkill(items[0].text);
+          /* ---- TIER 2: Plugin Skills ---- */
+          html += '<div class="doc-section-title">Plugin Skills (' + pluginSkills.length + ')</div>';
+
+          /* Group by publisher */
+          var publisherMap = Object.create(null);
+          pluginSkills.forEach(function (skill) {
+            var pub = skill.publisher || 'unknown';
+            if (!publisherMap[pub]) publisherMap[pub] = [];
+            publisherMap[pub].push(skill);
+          });
+
+          /* Sort publishers: descending count, then alpha */
+          var publishers = Object.keys(publisherMap).sort(function (a, b) {
+            var diff = publisherMap[b].length - publisherMap[a].length;
+            return diff !== 0 ? diff : a.localeCompare(b);
+          });
+
+          publishers.forEach(function (pub, groupIdx) {
+            var groupSkills = publisherMap[pub];
+            html +=
+              '<div class="doc-group">' +
+              '<div class="doc-group-header" data-group="' + groupIdx + '">' +
+              '<span class="doc-chevron">▸</span> ' +
+              CCE.markdown.esc(pub) +
+              ' <span class="doc-group-count">(' + groupSkills.length + ')</span>' +
+              '</div>' +
+              '<div class="doc-group-items">';
+
+            groupSkills.forEach(function (skill) {
+              var entryIdx = openables.length;
+              openables.push({ read: skill.read.bind(skill) });
+              html +=
+                '<div class="doc-item" data-skill-idx="' + entryIdx + '">' +
+                CCE.markdown.esc(skill.name) +
+                '</div>';
+            });
+
+            html += '</div></div>'; /* .doc-group-items + .doc-group */
+          });
+
+          listEl.innerHTML = html;
+
+          /* Auto-open first user skill (cheap — we already have the text) */
+          if (firstUserIdx !== -1) {
+            var firstItemEl = listEl.querySelector('[data-skill-idx="' + firstUserIdx + '"]');
+            if (firstItemEl) firstItemEl.classList.add('active');
+
+            var firstUserItem = userItems[0];
+            if (firstUserItem && firstUserItem.text) {
+              bodyEl.innerHTML =
+                '<div class="vwr-md-content">' +
+                CCE.markdown.render(stripFrontmatter(firstUserItem.text)) +
+                '</div>';
+            }
+          } else if (pluginSkills.length > 0) {
+            /* No user skills — show hint instead of auto-reading a plugin skill */
+            bodyEl.innerHTML =
+              '<div class="doc-empty">' +
+              '<h3>Select a skill</h3>' +
+              '<p>Click a skill in the sidebar to view its documentation.</p>' +
+              '</div>';
           }
 
-          /* Wire click events */
-          listEl.addEventListener('click', function (e) {
-            var item = e.target.closest('.doc-item');
-            if (!item) return;
-            listEl.querySelectorAll('.doc-item').forEach(function (el) {
-              el.classList.remove('active');
-            });
-            item.classList.add('active');
-            var idx = parseInt(item.getAttribute('data-idx'), 10);
-            if (items[idx]) showSkill(items[idx].text);
-          });
-        });
+        }); /* end Promise.all(userReads) */
 
       }).catch(function (err) {
-        console.error('[CCE skills] listSkills failed:', err);
+        console.error('[CCE skills] load failed:', err);
         bodyEl.innerHTML =
           '<div class="doc-empty">' +
           '<h3>Could not load skills</h3>' +
