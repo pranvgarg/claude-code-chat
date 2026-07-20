@@ -1,0 +1,81 @@
+/* ============================================================
+   CLAUDE CODE EXPLORER — tokens.css
+   CSS custom properties (design tokens), font stacks, grain overlay.
+   Ported verbatim from docs/mockups/sessions-v2.html.
+   NO values changed.
+   ============================================================ */
+
+:root {
+  --bg:        #0b0e14;
+  --surface:   #11161f;
+  --surface-2: #151b25;
+  --elevated:  #1b222e;
+  --border:    #232b38;
+  --border-soft:#1a212c;
+  --text:      #e8edf4;
+  --text-dim:  #9aa7b8;
+  --text-faint:#5d6b7d;
+
+  --accent:    #5b9dff;
+  --c-user:    #5b9dff;
+  --c-assistant:#c99bff;
+  --c-tool:    #6fe08a;
+  --c-thinking:#f0a24e;
+  --c-system:  #f778ba;
+  --c-cost:    #f0b354;
+
+  --font-display: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  --r: 10px;
+  --r-sm: 7px;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+}
+
+[data-theme="light"] {
+  --bg:        #f5f3ef;
+  --surface:   #ffffff;
+  --surface-2: #faf8f4;
+  --elevated:  #ffffff;
+  --border:    #e2ddd3;
+  --border-soft:#ece7dd;
+  --text:      #1c2129;
+  --text-dim:  #5c6774;
+  --text-faint:#97a1af;
+  --accent:    #2f6fe0;
+  --c-user:    #2f6fe0;
+  --c-assistant:#8250df;
+  --c-tool:    #1a8f3c;
+  --c-thinking:#c1660c;
+  --c-system:  #bf3989;
+  --c-cost:    #b9791c;
+  --shadow: 0 1px 2px rgba(31,35,41,.06), 0 12px 28px -16px rgba(31,35,41,.22);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html, body { height:100%; }
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* Subtle grain overlay for atmosphere/depth */
+body::after {
+  content:"";
+  position: fixed; inset:0;
+  pointer-events:none;
+  z-index: 9999;
+  opacity:.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.hidden { display:none !important; }
