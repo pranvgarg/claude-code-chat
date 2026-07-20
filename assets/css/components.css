@@ -294,20 +294,64 @@
   font-size: 13px;
   overflow-wrap: break-word;
 }
-.vwr-user      { background: var(--surface); border-left: 3px solid var(--c-user); }
-.vwr-assistant { background: var(--surface-2); border-left: 3px solid var(--c-assistant); }
-.vwr-system    { background: transparent; border-left: 3px solid var(--c-system); opacity: .7; font-size: 11.5px; }
-.vwr-progress  { background: transparent; border-left: 2px solid var(--text-faint); opacity: .5; font-size: 11px; padding: 5px 13px; }
-.vwr-snapshot  { background: transparent; border-left: 2px solid var(--text-faint); opacity: .4; font-size: 11px; padding: 4px 13px; }
+/* Chatbot layout: user bubbles on the right, assistant on the left. */
+.vwr-user {
+  background: color-mix(in srgb, var(--c-user) 12%, var(--surface));
+  border-right: 3px solid var(--c-user);
+  align-self: flex-end;
+  max-width: 76%;
+  border-radius: 12px 12px 4px 12px;
+}
+.vwr-assistant {
+  background: var(--surface-2);
+  border-left: 3px solid var(--c-assistant);
+  align-self: flex-start;
+  max-width: 92%;
+  border-radius: 12px 12px 12px 4px;
+}
+.vwr-system    { background: transparent; border-left: 3px solid var(--c-system); opacity: .7; font-size: 11.5px; align-self: stretch; }
+.vwr-progress  { background: transparent; border-left: 2px solid var(--text-faint); opacity: .5; font-size: 11px; padding: 5px 13px; align-self: stretch; }
+.vwr-snapshot  { background: transparent; border-left: 2px solid var(--text-faint); opacity: .4; font-size: 11px; padding: 4px 13px; align-self: stretch; }
 
 .vwr-entry-header {
   display: flex; align-items: center; gap: 9px;
   margin-bottom: 7px; font-size: 11px; color: var(--text-faint);
 }
+.vwr-user .vwr-entry-header { justify-content: flex-end; }
 .vwr-role { font-weight: 700; text-transform: uppercase; letter-spacing: .5px; font-size: 10px; }
 .vwr-user .vwr-role      { color: var(--c-user); }
 .vwr-assistant .vwr-role { color: var(--c-assistant); }
 .vwr-system .vwr-role    { color: var(--c-system); }
+
+/* Subagents section — transcripts spawned inside a session */
+.vwr-subagents {
+  max-width: 860px; width: 100%; box-sizing: border-box;
+  margin: 8px auto 0; padding: 12px 20px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.vwr-subagents-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--text-faint); margin-bottom: 8px;
+}
+.vwr-subagents-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.vwr-subagent {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-mono); font-size: 11.5px;
+  color: var(--text-dim); text-decoration: none;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; padding: 5px 12px;
+  transition: border-color .12s, color .12s;
+}
+.vwr-subagent:hover { color: var(--text); border-color: color-mix(in srgb, var(--c-tool) 45%, var(--border)); }
+.vwr-subagent svg { color: var(--c-tool); flex-shrink: 0; }
+.vwr-sub-back { color: var(--c-user); text-decoration: none; font-weight: 600; }
+.vwr-sub-back:hover { text-decoration: underline; }
+.vwr-sub-tag {
+  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--c-tool);
+  background: color-mix(in srgb, var(--c-tool) 14%, transparent);
+  padding: 1px 7px; border-radius: 5px;
+}
 
 .vwr-model-badge {
   background: color-mix(in srgb, var(--c-assistant) 15%, transparent);

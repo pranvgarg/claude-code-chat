@@ -72,6 +72,27 @@
     return out;
   }
 
+  /* Pure helper: subagent transcripts for one session, stored at
+     projects/<projectFolder>/<sessionId>/subagents/<agent>.jsonl */
+  function subagentsFromFileList(fileList, projectFolder, sessionId) {
+    var out = [];
+    for (var i = 0; i < fileList.length; i++) {
+      var f = fileList[i];
+      var parts = (f.webkitRelativePath || f.relPath || '').split('/');
+      var pi = parts.indexOf('projects');
+      if (pi === -1) continue;
+      var fname = f.name || parts[parts.length - 1];
+      if (!/\.jsonl$/.test(fname)) continue;
+      if (parts[pi + 1] !== projectFolder) continue;
+      if (parts[pi + 2] !== sessionId) continue;
+      if (parts[pi + 3] !== 'subagents') continue;
+      if (parts[pi + 4] !== fname) continue;
+      if (parts.length !== pi + 5) continue;
+      out.push({ id: fname.replace(/\.jsonl$/, ''), _file: f });
+    }
+    return out;
+  }
+
   /* ------------------------------------------------------------------ */
   /* webkitdirectory picker (always available)                           */
   /* ------------------------------------------------------------------ */
@@ -224,6 +245,14 @@
     return Promise.resolve(out);
   }
 
+  /* listSubagents — subagent transcripts spawned inside one session. */
+  function listSubagents(projectFolder, sessionId) {
+    var descs = subagentsFromFileList(_files, projectFolder, sessionId);
+    return Promise.resolve(descs.map(function (d) {
+      return { id: d.id, read: function () { return d._file.text(); } };
+    }));
+  }
+
   /* ------------------------------------------------------------------ */
   /* Public surface                                                       */
   /* ------------------------------------------------------------------ */
@@ -231,8 +260,10 @@
     get mode() { return _isServer ? 'server' : 'picker'; },
     SKIP_DIRS: SKIP_DIRS,
     listSessions: listSessions,
+    listSubagents: listSubagents,
     // Exposed for unit testing only:
-    _sessionsFromFileList: sessionsFromFileList
+    _sessionsFromFileList: sessionsFromFileList,
+    _subagentsFromFileList: subagentsFromFileList
   };
 
   CCE.connect = {

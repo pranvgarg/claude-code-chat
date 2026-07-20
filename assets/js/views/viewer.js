@@ -553,16 +553,17 @@
   CCE.router.register('#/viewer', {
     title: 'Viewer',
     mount: function (root) {
-      /* ---- 1. Parse session id from hash query ---- */
+      /* ---- 1. Parse session id (+ optional subagent) from hash query ---- */
       var hash = location.hash || '';
       var qIdx = hash.indexOf('?');
-      var id = '';
+      var id = '', sub = '';
       if (qIdx !== -1) {
-        var qs = hash.slice(qIdx + 1);
-        var params = qs.split('&');
+        var params = hash.slice(qIdx + 1).split('&');
         for (var pi = 0; pi < params.length; pi++) {
           var kv = params[pi].split('=');
-          if (kv[0] === 'id') { id = decodeURIComponent(kv.slice(1).join('=')); break; }
+          var val = decodeURIComponent(kv.slice(1).join('='));
+          if (kv[0] === 'id') id = val;
+          else if (kv[0] === 'sub') sub = val;
         }
       }
 
@@ -602,6 +603,7 @@
           '</aside>' +
           '<div class="vwr-main">' +
             '<div class="vwr-session-meta" id="vwr-session-meta"></div>' +
+            '<div id="vwr-subagents"></div>' +
             '<div class="vwr-conv" id="vwr-conv"></div>' +
           '</div>' +
         '</div>';
@@ -609,6 +611,7 @@
       var conv = root.querySelector('#vwr-conv');
       var tocContent = root.querySelector('#vwr-toc-content');
       var metaEl = root.querySelector('#vwr-session-meta');
+      var subagentsEl = root.querySelector('#vwr-subagents');
 
       /* ---- 4. Wire toolbar controls ---- */
       function reRender() {
@@ -706,53 +709,89 @@
       }
 
       // Show loading
-      conv.innerHTML = '<div class="empty"><p>Loading session…</p></div>';
+      conv.innerHTML = '<div class="empty"><p>Loading…</p></div>';
 
-      CCE.fsaccess.listSessions().then(function (items) {
-        var item = null;
-        for (var ii = 0; ii < items.length; ii++) {
-          if (items[ii].id === id) { item = items[ii]; break; }
+      function buildMeta(entries, prefixHtml) {
+        var branch = '', version = '', slug = '';
+        for (var ei = 0; ei < entries.length; ei++) {
+          var e = entries[ei];
+          if (!branch && e.gitBranch) branch = e.gitBranch;
+          if (!version && e.version)  version = e.version;
+          if (!slug && e.slug)        slug = e.slug;
         }
-        if (!item) {
-          conv.innerHTML = '<div class="empty"><h3>Session not found</h3><p>ID: ' + esc(id) + '</p></div>';
-          return;
+        var totalCost = 0;
+        for (var ci = 0; ci < entries.length; ci++) {
+          var ce = entries[ci];
+          if (ce.type === 'assistant' && ce.message && ce.message.usage) {
+            totalCost += CCE.cost.estimate(ce.message.model || '', ce.message.usage);
+          }
         }
-        return item.read().then(function (text) {
+        var mp = [];
+        if (prefixHtml) mp.push(prefixHtml);
+        if (slug)    mp.push('<span title="Session slug">' + esc(slug) + '</span>');
+        if (branch)  mp.push('<span>branch: ' + esc(branch) + '</span>');
+        if (version) mp.push('<span>v' + esc(version) + '</span>');
+        mp.push('<span>' + entries.length + ' entries</span>');
+        if (totalCost > 0) mp.push('<span>Est. cost: $' + totalCost.toFixed(2) + '</span>');
+        if (metaEl) metaEl.innerHTML = mp.join('<span class="vwr-meta-sep">\xb7</span>');
+      }
+
+      function loadInto(readFn, prefixHtml) {
+        return readFn().then(function (text) {
           var entries = CCE.jsonl.parse(text);
           _state.entries = entries;
           _state.toolResults = CCE.jsonl.indexToolResults(entries);
           _state.search = '';
           _state.searchIndex = 0;
           _state.searchMatches = [];
-
-          // Session meta bar
-          var sessionId   = '';
-          var branch      = '';
-          var version     = '';
-          var slug        = '';
-          for (var ei = 0; ei < entries.length; ei++) {
-            var e = entries[ei];
-            if (!sessionId && e.sessionId) sessionId = e.sessionId;
-            if (!branch && e.gitBranch)    branch    = e.gitBranch;
-            if (!version && e.version)     version   = e.version;
-            if (!slug && e.slug)           slug      = e.slug;
-          }
-          var totalCost = 0;
-          for (var ci = 0; ci < entries.length; ci++) {
-            var ce = entries[ci];
-            if (ce.type === 'assistant' && ce.message && ce.message.usage) {
-              totalCost += CCE.cost.estimate(ce.message.model || '', ce.message.usage);
-            }
-          }
-          var metaParts = [];
-          if (slug)    metaParts.push('<span title="Session slug">' + esc(slug) + '</span>');
-          if (branch)  metaParts.push('<span>branch: ' + esc(branch) + '</span>');
-          if (version) metaParts.push('<span>v' + esc(version) + '</span>');
-          metaParts.push('<span>' + entries.length + ' entries</span>');
-          if (totalCost > 0) metaParts.push('<span>Est. cost: $' + totalCost.toFixed(2) + '</span>');
-          if (metaEl) metaEl.innerHTML = metaParts.join('<span class="vwr-meta-sep">\xb7</span>');
-
+          buildMeta(entries, prefixHtml);
           reRender();
+        });
+      }
+
+      CCE.fsaccess.listSessions().then(function (items) {
+        var parent = null;
+        for (var ii = 0; ii < items.length; ii++) {
+          if (items[ii].id === id) { parent = items[ii]; break; }
+        }
+        if (!parent) {
+          conv.innerHTML = '<div class="empty"><h3>Session not found</h3><p>ID: ' + esc(id) + '</p></div>';
+          return;
+        }
+        var projectFolder = parent.projectFolder;
+
+        if (sub) {
+          // Viewing a subagent transcript spawned inside this session.
+          return CCE.fsaccess.listSubagents(projectFolder, id).then(function (subs) {
+            var si = null;
+            for (var k = 0; k < subs.length; k++) { if (subs[k].id === sub) { si = subs[k]; break; } }
+            if (!si) {
+              conv.innerHTML = '<div class="empty"><h3>Subagent not found</h3><p>' + esc(sub) + '</p></div>';
+              return;
+            }
+            var backLink = '<a class="vwr-sub-back" href="#/viewer?id=' + encodeURIComponent(id) + '">← parent session</a>';
+            var subTag = '<span class="vwr-sub-tag">subagent</span>';
+            return loadInto(si.read, backLink + subTag);
+          });
+        }
+
+        return loadInto(parent.read).then(function () {
+          // Surface any subagents this session spawned.
+          if (!subagentsEl) return;
+          subagentsEl.innerHTML = '';
+          return CCE.fsaccess.listSubagents(projectFolder, id).then(function (subs) {
+            if (!subs || subs.length === 0) return;
+            var rows = subs.map(function (s) {
+              var label = s.id.replace(/^agent-/, '');
+              return '<a class="vwr-subagent" href="#/viewer?id=' + encodeURIComponent(id) +
+                '&sub=' + encodeURIComponent(s.id) + '" title="' + esc(s.id) + '">' +
+                '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M9 2h6M9 14h.01M15 14h.01"/></svg>' +
+                esc(label) + '</a>';
+            }).join('');
+            subagentsEl.innerHTML =
+              '<div class="vwr-subagents-title">Subagents spawned in this session (' + subs.length + ')</div>' +
+              '<div class="vwr-subagents-list">' + rows + '</div>';
+          });
         });
       }).catch(function (err) {
         conv.innerHTML = '<div class="empty"><h3>Failed to load session</h3><p>' + esc(err && err.message ? err.message : String(err)) + '</p></div>';

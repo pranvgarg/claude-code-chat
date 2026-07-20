@@ -2,14 +2,19 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "claude-code-conversation.schema.json",
   "title": "Claude Code Conversation JSONL Entry",
-  "description": "Schema for a single line in a Claude Code conversation .jsonl file. Each line is one of several entry types.",
+  "description": "Schema for a single line in a Claude Code conversation .jsonl file. Each line is one of several entry types. Verified against Claude Code CLI v2.1.x logs.",
   "oneOf": [
     { "$ref": "#/$defs/AssistantEntry" },
     { "$ref": "#/$defs/UserEntry" },
     { "$ref": "#/$defs/ProgressEntry" },
     { "$ref": "#/$defs/SystemEntry" },
     { "$ref": "#/$defs/FileHistorySnapshotEntry" },
-    { "$ref": "#/$defs/LastPromptEntry" }
+    { "$ref": "#/$defs/LastPromptEntry" },
+    { "$ref": "#/$defs/AttachmentEntry" },
+    { "$ref": "#/$defs/AiTitleEntry" },
+    { "$ref": "#/$defs/ModeEntry" },
+    { "$ref": "#/$defs/PermissionModeEntry" },
+    { "$ref": "#/$defs/QueueOperationEntry" }
   ],
 
   "$defs": {
@@ -25,7 +30,8 @@
         "gitBranch":   { "type": "string" },
         "slug":        { "type": "string", "description": "Human-readable session name, e.g. transient-wondering-starlight" },
         "isSidechain": { "type": "boolean" },
-        "userType":    { "type": "string", "enum": ["external", "internal"] }
+        "userType":    { "type": "string", "enum": ["external", "internal"] },
+        "entrypoint":  { "type": "string", "description": "How the session was launched, e.g. cli" }
       },
       "required": ["uuid", "sessionId", "timestamp", "type"]
     },
@@ -225,6 +231,79 @@
         "sessionId":  { "type": "string" }
       },
       "required": ["type", "lastPrompt", "sessionId"]
+    },
+
+    "AttachmentEntry": {
+      "allOf": [{ "$ref": "#/$defs/CommonFields" }],
+      "type": "object",
+      "description": "Auxiliary data attached to the conversation — most commonly hook execution results (stdout/stderr/exitCode of a hook command).",
+      "properties": {
+        "type":       { "const": "attachment" },
+        "attachment": { "$ref": "#/$defs/Attachment" }
+      },
+      "required": ["type", "attachment"]
+    },
+
+    "Attachment": {
+      "type": "object",
+      "properties": {
+        "type":       { "type": "string", "description": "Attachment subtype, e.g. hook_success, hook_error" },
+        "hookName":   { "type": "string", "description": "Hook that produced this, e.g. SessionStart:startup" },
+        "hookEvent":  { "type": "string", "description": "Hook event, e.g. SessionStart, PreToolUse, Stop, UserPromptSubmit" },
+        "toolUseID":  { "type": "string" },
+        "command":    { "type": "string", "description": "Command the hook ran" },
+        "content":    { "type": "string" },
+        "stdout":     { "type": "string" },
+        "stderr":     { "type": "string" },
+        "exitCode":   { "type": "integer" },
+        "durationMs": { "type": "integer" }
+      },
+      "required": ["type"]
+    },
+
+    "AiTitleEntry": {
+      "allOf": [{ "$ref": "#/$defs/CommonFields" }],
+      "type": "object",
+      "description": "Auto-generated human-readable title for the session.",
+      "properties": {
+        "type":    { "const": "ai-title" },
+        "aiTitle": { "type": "string" }
+      },
+      "required": ["type", "aiTitle"]
+    },
+
+    "ModeEntry": {
+      "allOf": [{ "$ref": "#/$defs/CommonFields" }],
+      "type": "object",
+      "description": "Records the active interaction mode at a point in the session.",
+      "properties": {
+        "type": { "const": "mode" },
+        "mode": { "type": "string", "description": "e.g. normal, plan, accept-edits" }
+      },
+      "required": ["type", "mode"]
+    },
+
+    "PermissionModeEntry": {
+      "allOf": [{ "$ref": "#/$defs/CommonFields" }],
+      "type": "object",
+      "description": "Records the active permission mode at a point in the session.",
+      "properties": {
+        "type":           { "const": "permission-mode" },
+        "permissionMode": { "type": "string", "description": "e.g. default, acceptEdits, bypassPermissions, plan" }
+      },
+      "required": ["type", "permissionMode"]
+    },
+
+    "QueueOperationEntry": {
+      "allOf": [{ "$ref": "#/$defs/CommonFields" }],
+      "type": "object",
+      "description": "A queued user-message operation (e.g. a prompt enqueued while the agent was busy).",
+      "properties": {
+        "type":      { "const": "queue-operation" },
+        "operation": { "type": "string", "description": "e.g. enqueue, dequeue" },
+        "content":   { "type": "string", "description": "The queued prompt text" }
+      },
+      "required": ["type", "operation"]
     }
   }
 }
