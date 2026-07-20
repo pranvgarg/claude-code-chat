@@ -186,7 +186,7 @@
     var delta = relativeTimeDelta(lastTimestamp, entry.timestamp);
     var deltaHtml = delta ? ' <span class="vwr-time-delta">' + esc(delta) + '</span>' : '';
 
-    var imageHtml = '';
+    var imageSrcs = [];
     if (Array.isArray(content)) {
       for (var i = 0; i < content.length; i++) {
         var block = content[i];
@@ -194,7 +194,7 @@
           var src = block.source && block.source.type === 'base64'
             ? 'data:' + (block.source.media_type || 'image/png') + ';base64,' + block.source.data
             : (block.source && block.source.url) || '';
-          if (src) imageHtml += '<img class="vwr-inline-image" src="' + src + '" alt="User image">';
+          if (src) imageSrcs.push(src);
         }
       }
     }
@@ -206,8 +206,16 @@
         '<span class="vwr-role">User</span>' +
         '<span>' + esc(ts) + '</span>' + deltaHtml +
       '</div>' +
-      '<div class="vwr-text-content">' + (search ? highlight(esc(text), search) : esc(text)) + '</div>' +
-      imageHtml;
+      '<div class="vwr-text-content">' + (search ? highlight(esc(text), search) : esc(text)) + '</div>';
+    // Images added via DOM (src assigned as a property) so a crafted image URL
+    // in an untrusted .jsonl cannot break out of the attribute or inject handlers.
+    for (var im = 0; im < imageSrcs.length; im++) {
+      var img = document.createElement('img');
+      img.className = 'vwr-inline-image';
+      img.alt = 'User image';
+      img.src = imageSrcs[im];
+      div.appendChild(img);
+    }
     return div;
   }
 
