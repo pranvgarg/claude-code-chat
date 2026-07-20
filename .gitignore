@@ -18,3 +18,13 @@ yarn-error.log*
 # Local scratch / temp
 *.log
 .tmp/
+
+# --- Internal dev artifacts: kept LOCAL, not published to GitHub ---
+# Test suites and fixtures (run locally with `node --test test/`)
+test/
+# Design docs, mockups, specs, and implementation plans
+docs/
+# Stray planning notes
+plan.md
+*.plan.md
+plans/
