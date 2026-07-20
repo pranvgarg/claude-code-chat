@@ -30,6 +30,9 @@
   // Each entry is { webkitRelativePath|relPath, name, text:()=>Promise<string> }
   var _files = [];
 
+  // Cache for listPluginSkills — populated on first call, reused thereafter.
+  var _pluginSkillsCache = null;
+
   /* ------------------------------------------------------------------ */
   /* Pure helper: filter a flat file list down to session descriptors    */
   /* ------------------------------------------------------------------ */
@@ -94,12 +97,19 @@
   }
 
   /* Pure helper: skill descriptors stored at skills/<name>/SKILL.md
-     Also accepts one extra namespace level: skills/<ns>/<name>/SKILL.md */
+     Also accepts one extra namespace level: skills/<ns>/<name>/SKILL.md
+     Excludes any path that contains a 'plugins' segment (those are Tier-2). */
   function skillsFromFileList(fileList) {
     var out = [];
     for (var i = 0; i < fileList.length; i++) {
       var f = fileList[i];
       var parts = (f.webkitRelativePath || f.relPath || '').split('/');
+      // Exclude plugin paths — they belong to Tier-2 (pluginSkillsFromFileList).
+      var hasPlugins = false;
+      for (var j = 0; j < parts.length; j++) {
+        if (parts[j] === 'plugins') { hasPlugins = true; break; }
+      }
+      if (hasPlugins) continue;
       var pi = parts.indexOf('skills');
       if (pi === -1) continue;
       var fname = f.name || parts[parts.length - 1];
@@ -115,6 +125,53 @@
         continue;
       }
       out.push({ name: skillName, _file: f });
+    }
+    return out;
+  }
+
+  /* Pure helper: plugin skill descriptors — any SKILL.md whose path contains
+     a 'plugins' segment (Tier-2).
+     publisher derivation (generic, no fixed depth):
+       - find the 'plugins' segment index.
+       - scan forward for 'cache' or 'marketplaces'; publisher = segment after it.
+       - if neither found, publisher = segment right after 'plugins'.
+       - if still nothing, publisher = 'unknown'.
+     name: the folder that directly contains SKILL.md (parts[length-2]). */
+  function pluginSkillsFromFileList(fileList) {
+    var out = [];
+    for (var i = 0; i < fileList.length; i++) {
+      var f = fileList[i];
+      var parts = (f.webkitRelativePath || f.relPath || '').split('/');
+      // Must contain a 'plugins' segment.
+      var pluginsIdx = parts.indexOf('plugins');
+      if (pluginsIdx === -1) continue;
+      // Must be named SKILL.md.
+      var fname = f.name || parts[parts.length - 1];
+      if (fname !== 'SKILL.md') continue;
+
+      // Derive publisher: look for 'cache' or 'marketplaces' after 'plugins'.
+      var publisher = 'unknown';
+      var foundAnchor = false;
+      for (var k = pluginsIdx + 1; k < parts.length - 1; k++) {
+        if (parts[k] === 'cache' || parts[k] === 'marketplaces') {
+          if (k + 1 < parts.length - 1) {
+            publisher = parts[k + 1];
+          }
+          foundAnchor = true;
+          break;
+        }
+      }
+      if (!foundAnchor) {
+        // Fall back: segment right after 'plugins'.
+        if (pluginsIdx + 1 < parts.length - 1) {
+          publisher = parts[pluginsIdx + 1];
+        }
+      }
+
+      // name: folder directly containing SKILL.md.
+      var skillName = parts[parts.length - 2] || 'unknown';
+
+      out.push({ publisher: publisher, name: skillName, _file: f });
     }
     return out;
   }
@@ -316,6 +373,104 @@
     }));
   }
 
+  /* Recursively collect SKILL.md files under a plugins directory handle.
+     Pruning is light: skip node_modules and .git only (NOT cache — plugin
+     skills live under plugins/cache/...). */
+  var PLUGIN_SKIP_DIRS = new Set(['node_modules', '.git']);
+
+  function collectPluginsFromHandle(dirHandle, prefix) {
+    var result = [];
+    return (function recurse(handle, path) {
+      var entries = [];
+      return new Promise(function (resolve) {
+        var iter = handle.entries();
+        function step() {
+          iter.next().then(function (r) {
+            if (r.done) { resolve(entries); return; }
+            entries.push(r.value);
+            step();
+          });
+        }
+        step();
+      }).then(function (pairs) {
+        var tasks = [];
+        for (var k = 0; k < pairs.length; k++) {
+          (function (name, child) {
+            var childPath = path ? path + '/' + name : name;
+            if (child.kind === 'directory') {
+              if (PLUGIN_SKIP_DIRS.has(name)) return; // prune heavy/irrelevant dirs
+              tasks.push(recurse(child, childPath));
+            } else if (name === 'SKILL.md') {
+              // Capture fileHandle in closure for lazy read.
+              (function (fileHandle, fp) {
+                result.push({
+                  relPath: fp,
+                  name: 'SKILL.md',
+                  text: function () { return fileHandle.getFile().then(function (f) { return f.text(); }); }
+                });
+              })(child, childPath);
+            }
+          })(pairs[k][0], pairs[k][1]);
+        }
+        return Promise.all(tasks);
+      });
+    })(dirHandle, prefix).then(function () { return result; });
+  }
+
+  /* listPluginSkills — on-demand, lazy; cached after first call.
+     Returns Promise<[{ publisher, name, read:()=>Promise<string> }]> */
+  function listPluginSkills() {
+    // 1. Picker mode: _files already contains plugin files (they were not pruned).
+    var pickerDescs = pluginSkillsFromFileList(_files);
+    if (pickerDescs.length > 0) {
+      return Promise.resolve(pickerDescs.map(function (d) {
+        return {
+          publisher: d.publisher,
+          name: d.name,
+          read: function () { return d._file.text(); }
+        };
+      }));
+    }
+
+    // 2. Return cache if already populated.
+    if (_pluginSkillsCache !== null) {
+      return Promise.resolve(_pluginSkillsCache);
+    }
+
+    // 3. FSA mode: walk plugins/ on demand.
+    if (!g.indexedDB) {
+      _pluginSkillsCache = [];
+      return Promise.resolve(_pluginSkillsCache);
+    }
+
+    return loadHandle().then(function (root) {
+      if (!root) {
+        _pluginSkillsCache = [];
+        return _pluginSkillsCache;
+      }
+      return root.getDirectoryHandle('plugins').then(function (pluginsHandle) {
+        return collectPluginsFromHandle(pluginsHandle, 'plugins');
+      }).then(function (rawList) {
+        var descs = pluginSkillsFromFileList(rawList);
+        _pluginSkillsCache = descs.map(function (d) {
+          return {
+            publisher: d.publisher,
+            name: d.name,
+            read: function () { return d._file.text(); }
+          };
+        });
+        return _pluginSkillsCache;
+      }).catch(function () {
+        // plugins/ directory doesn't exist or access denied.
+        _pluginSkillsCache = [];
+        return _pluginSkillsCache;
+      });
+    }).catch(function () {
+      _pluginSkillsCache = [];
+      return _pluginSkillsCache;
+    });
+  }
+
   /* ------------------------------------------------------------------ */
   /* Public surface                                                       */
   /* ------------------------------------------------------------------ */
@@ -326,11 +481,13 @@
     listSubagents: listSubagents,
     listPlans: listPlans,
     listSkills: listSkills,
+    listPluginSkills: listPluginSkills,
     // Exposed for unit testing only:
     _sessionsFromFileList: sessionsFromFileList,
     _subagentsFromFileList: subagentsFromFileList,
     _plansFromFileList: plansFromFileList,
-    _skillsFromFileList: skillsFromFileList
+    _skillsFromFileList: skillsFromFileList,
+    _pluginSkillsFromFileList: pluginSkillsFromFileList
   };
 
   CCE.connect = {
