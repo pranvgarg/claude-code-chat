@@ -170,16 +170,18 @@
   </main>
 </div>
 
-<!-- Modules: core first, then views, then app -->
+<!-- Modules: core first, then app.js (defines CCE.router/CCE.app), then views.
+     Views call CCE.router.register(...) at load, so app.js MUST precede them.
+     boot() still runs on DOMContentLoaded, after every script has loaded. -->
 <script src="assets/js/core/store.js"></script>
 <script src="assets/js/core/cost.js"></script>
 <script src="assets/js/core/jsonl.js"></script>
 <script src="assets/js/core/session-index.js"></script>
 <script src="assets/js/core/fsaccess.js"></script>
+<script src="assets/js/app.js"></script>
 <script src="assets/js/views/browse.js"></script>
 <script src="assets/js/views/viewer.js"></script>
 <script src="assets/js/views/dashboard.js"></script>
-<script src="assets/js/app.js"></script>
 
 </body>
 </html>
