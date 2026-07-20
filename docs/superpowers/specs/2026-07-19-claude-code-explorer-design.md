@@ -150,9 +150,18 @@ fast even with many projects. Full-file parse happens only when a session is ope
 
 ## 6. Feature detail
 
+### 6.0 View-mode toggle (applies to ALL collection panels)
+Every collection panel (Sessions, Plans, Skills, Commands) offers the **same
+segmented view toggle with three modes**, remembered per-panel in `localStorage`:
+- **List** (default) — dense rows with aligned columns; groupable by project.
+- **Grid** — rich cards (preview + metadata), colour-accented by model/type.
+- **Tiles** — compact, many-per-row, title + one key stat for glanceable overview.
+
+The reference implementation of all three is `docs/mockups/sessions-v2.html`
+(renders one dataset through three renderers; toggle + persistence working).
+
 ### 6.1 Session Browser (`views/browse.js`)
-- **Default view: dense list** grouped-by-project capable, with a **cards toggle**
-  (Style A ⇄ Style B), remembered in `localStorage`.
+- **Default view: List**, with the **Grid / Tiles** toggle from §6.0.
 - Two ordering modes: **Recent-first flat list** (default) and **Group-by-project**.
 - **Rich session data** per row/card: first-prompt preview, project path, relative
   last-modified, message count, model badge, git branch chip, estimated cost, file size.
@@ -207,15 +216,39 @@ Launcher (future, Node): built-in `http` + `fs` (zero-dep server + read), `open`
 
 ## 8. Design system
 
-From the approved mockups (`docs/mockups/`):
-- Dark theme default + light theme, driven entirely by CSS custom properties;
-  instant toggle, persisted in `localStorage`.
-- Base tokens continue the current palette (bg `#0d1117`, surfaces, border) and
-  colour grammar: **blue = user, purple = assistant, green = tool, orange =
-  thinking, pink = system**. This grammar is consistent across viewer, chips, bars.
-- Mono font for all technical strings (paths, models, costs, tokens); system sans
-  for prose. Rounded corners (~8–12px), subtle hover/active states, icon sidebar.
-- Real empty / loading / error states (not blank screens).
+**Aesthetic direction: "editorial terminal"** — a refined dark developer tool with
+an **editorial serif** used for the wordmark and large numbers (unexpected elegance
+against the data), mono for all technical strings, one sharp accent, hairline
+borders, and a **subtle grain overlay** for depth. Reference:
+`docs/mockups/sessions-v2.html` (verified in browser). Not maximalist — precision
+and restraint over intensity.
+
+- Dark theme default + light theme (a warm paper-white `#f5f3ef`, not generic pure
+  white), driven entirely by CSS custom properties; instant toggle, persisted.
+- Colour grammar: **blue = user/sonnet, purple = assistant/opus, green = tool,
+  orange = thinking, pink = system, amber = cost**. Consistent across cards, chips,
+  bars, rows.
+- **Typography / offline (fixes the v1 violation):** the first mockups pulled fonts
+  from the Google Fonts **CDN** and had **no `@font-face`**, so they broke
+  offline-first and silently degraded to system mono. Resolution — TWO acceptable
+  options, both CDN-free:
+  1. **Refined system stack (current v2):** editorial serif = `Georgia` (display),
+     `ui-monospace / 'SF Mono' / 'Cascadia Code' / 'JetBrains Mono'` (data), system
+     sans (UI). Zero downloads, truly offline.
+  2. **Vendored webface (optional, build-time):** download OFL fonts (e.g.
+     Instrument Serif + IBM Plex Mono) into `assets/vendor/fonts/` with local
+     `@font-face`. More distinctive; requires vendoring the `.woff2` files. Chosen
+     only with an explicit go-ahead to download.
+- Rounded corners (~8–12px), subtle hover/active (lift + border shift), icon sidebar.
+- **Real empty / loading / error states** (skeleton shimmer on load; a styled empty
+  state on no-match) — not blank screens. Demonstrated in `sessions-v2.html`.
+
+### 8.1 Viewer layout bug (must fix in build)
+The v1 `viewer.html` mockup has a real layout defect: the reading column is
+`max-width:820px; margin:0 auto` but the app background does not fill the pane,
+leaving a **white gap on the right edge** and lopsided whitespace. The real Viewer
+must use a full-bleed app background with a correctly centred, symmetric reading
+column. (Not yet re-mocked; captured here as a build requirement.)
 
 ---
 
