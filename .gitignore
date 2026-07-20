@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Editor / tooling caches
+.serena/
+.vscode/
+.idea/
+
+# Superpowers subagent-driven-development scratch (local recovery ledger + briefs/diffs)
+.superpowers/
+
+# Node (tests use only built-ins; no deps expected, but ignore if ever added)
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Local scratch / temp
+*.log
+.tmp/
