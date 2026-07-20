@@ -422,3 +422,274 @@ mark.vwr-active-match { background: rgba(255,200,50,.6); outline: 2px solid rgba
     position: fixed; top: 0; left: 0; height: 100vh; z-index: 200; width: 260px;
   }
 }
+
+/* ============================================================
+   DASHBOARD — Usage & Cost view
+   All classes prefixed dash- to avoid collisions.
+   ============================================================ */
+
+.dash-content {
+  padding: 20px 24px 40px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+/* Page header */
+.dash-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.dash-page-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.dash-date-hint {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+}
+
+/* Stat cards */
+.dash-stat-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.dash-stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.dash-stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+.dash-stat-card:nth-child(1)::after { background: var(--c-thinking); }
+.dash-stat-card:nth-child(2)::after { background: var(--c-user); }
+.dash-stat-card:nth-child(3)::after { background: var(--c-assistant); }
+.dash-stat-card:nth-child(4)::after { background: var(--c-tool); }
+.dash-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dash-stat-value {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.dash-stat-sub {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.dash-stat-sub strong {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Section */
+.dash-section { margin-bottom: 24px; }
+.dash-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.dash-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+}
+.dash-section-sub { font-size: 11.5px; color: var(--text-faint); }
+
+/* Project bars */
+.dash-proj-bars {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px 20px;
+}
+.dash-proj-row {
+  display: grid;
+  grid-template-columns: 200px 1fr 80px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.dash-proj-row:last-child { margin-bottom: 0; }
+.dash-proj-name {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-bar-track {
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 100px;
+  overflow: hidden;
+}
+.dash-bar-fill {
+  height: 100%;
+  border-radius: 100px;
+  transition: width 0.5s cubic-bezier(.4,0,.2,1);
+}
+.dash-proj-cost {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--c-cost);
+  text-align: right;
+}
+
+/* Activity bar chart */
+.dash-act-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 20px 20px 32px;
+}
+.dash-act-grid {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 80px;
+  position: relative;
+}
+.dash-act-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  position: relative;
+}
+.dash-act-bar {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  margin-top: auto;
+  min-height: 2px;
+  cursor: default;
+  transition: opacity 0.15s;
+}
+.dash-act-bar:hover { opacity: 0.75 !important; }
+.dash-act-label {
+  position: absolute;
+  bottom: -20px;
+  font-size: 9.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* Most expensive table */
+.dash-table {
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.dash-thead {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 140px 120px 70px 70px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.dash-th {
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+}
+.dash-tbody { background: var(--surface); }
+.dash-trow {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 140px 120px 70px 70px;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.dash-trow:last-child { border-bottom: none; }
+.dash-trow:hover { background: var(--surface-2); }
+.dash-td {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+.dash-td-prompt {
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 450;
+}
+.dash-model-tag {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.dash-model-tag.opus {
+  background: color-mix(in srgb, var(--c-assistant) 12%, transparent);
+  color: var(--c-assistant);
+  border: 1px solid color-mix(in srgb, var(--c-assistant) 22%, transparent);
+}
+.dash-model-tag.sonnet {
+  background: color-mix(in srgb, var(--c-user) 12%, transparent);
+  color: var(--c-user);
+  border: 1px solid color-mix(in srgb, var(--c-user) 22%, transparent);
+}
+.dash-cost-val {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--c-cost);
+  font-weight: 500;
+}
+.dash-empty-small {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  padding: 20px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+
+@media (max-width: 900px) {
+  .dash-stat-cards { grid-template-columns: repeat(2, 1fr); }
+  .dash-proj-row { grid-template-columns: 140px 1fr 70px; }
+  .dash-thead,
+  .dash-trow { grid-template-columns: minmax(0,1fr) 90px 80px 50px 60px; }
+}
