@@ -192,7 +192,30 @@ The reference implementation of all three is `docs/mockups/sessions-v2.html`
 - List on the left / rendered document on the right, per view.
 - Skills additionally surface `SKILL.md` frontmatter (name/description).
 
-### 6.5 Hooks view
+### 6.5 Persistence & local state (`core/store.js`)
+All "local-agnostic" user state — **favorites/stars, theme, per-panel view mode
+(List/Grid/Tiles), sort/group/filter prefs, recently-viewed** — persists across
+closing and reopening the file, via one versioned key (`cce.v1`) in `localStorage`.
+Favorites are keyed by **session UUID** (the stable `.jsonl` filename), so re-scanning
+the folder on reopen re-applies stars correctly. The Chrome/Edge folder grant (a
+non-string `FileSystemDirectoryHandle`) is stored in **IndexedDB**.
+
+`file://` reality: `localStorage` persists reliably on **Chrome/Edge/Firefox**;
+**Safari** restricts/clears it for double-clicked files (may even throw). Chosen
+robustness level (**localStorage + Export/Import + safe fallback**):
+- All storage access wrapped in `try/catch` with an **in-memory fallback** so the
+  app never crashes when storage is blocked.
+- A **one-time, non-nagging notice** if persistence is unavailable.
+- **Export / Import preferences** — download/upload a small `explorer-prefs.json`;
+  the universal, browser-agnostic backup and machine-portability path (covers Safari
+  and moving machines).
+- The **launcher phase** makes persistence bulletproof everywhere (real
+  `http://localhost` origin; optional on-disk prefs file).
+
+In the current `sessions-v2.html` mockup, theme + view mode already persist; stars
+are visual-only there and will be wired to `store.js` in the build.
+
+### 6.6 Hooks view
 - Renders the `hooks` block from `settings.json` (event → matcher → command) and
   links to the referenced scripts in `~/.claude/hooks/`.
 
