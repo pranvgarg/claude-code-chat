@@ -255,7 +255,7 @@
           _files = f;
           onConnected();
         }).catch(function (err) {
-          if (err && err.message !== 'cancelled') {
+          if (err && err.name !== 'AbortError' && err.message !== 'cancelled') {
             console.error('[CCE] connect failed:', err);
           }
         });
