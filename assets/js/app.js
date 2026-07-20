@@ -69,12 +69,4 @@
   }
   g.addEventListener('DOMContentLoaded', function () { CCE.app.boot(); });
 
-  // Temporary CCE.connect stub — replaced by fsaccess.js in Task 6.
-  // Wires btn-connect to the callback so the shell is navigable during development.
-  CCE.connect = CCE.connect || {
-    init: function (cb) {
-      var btn = document.getElementById('btn-connect');
-      if (btn) { btn.onclick = cb; }
-    }
-  };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
