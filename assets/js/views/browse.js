@@ -72,7 +72,7 @@
   var state = {
     view: 'list',
     sort: 'Recent',
-    group: 'Recent',
+    group: 'By project',
     q: ''
   };
 
@@ -352,13 +352,17 @@
       /* -------------------------------------------------------------- */
       state.view  = CCE.store.get('view', 'list');
       state.sort  = 'Recent';
-      state.group = 'Recent';
+      state.group = CCE.store.get('group', 'By project');
       state.q     = '';
 
       /* Update seg toggle buttons */
       ctxEl.querySelectorAll('#cce-seg button').forEach(function (b) {
         b.classList.toggle('on', b.dataset.view === state.view);
       });
+
+      /* Update group label to reflect current state */
+      var groupLabel = ctxEl.querySelector('#cce-group-label');
+      if (groupLabel) groupLabel.textContent = state.group;
 
       /* -------------------------------------------------------------- */
       /* 3. Wire controls                                                 */
@@ -397,6 +401,7 @@
         state.group = state.group === 'Recent' ? 'By project' : 'Recent';
         var lbl = ctxEl.querySelector('#cce-group-label');
         if (lbl) lbl.textContent = state.group;
+        CCE.store.set('group', state.group);
         if (_cached) renderStage(stage, totalEl, eyebrowEl, _cached);
       });
 
