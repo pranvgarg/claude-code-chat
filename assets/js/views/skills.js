@@ -179,7 +179,7 @@
 
             html +=
               '<div class="doc-item" data-skill-idx="' + entryIdx + '">' +
-              '<strong>' + CCE.markdown.esc(item.fm.name || item.skill.name) + '</strong>' +
+              '<strong>' + CCE.markdown.esc(item.skill.namespace ? (item.skill.namespace + ':' + item.skill.name) : (item.fm.name || item.skill.name)) + '</strong>' +
               (descTrunc
                 ? '<div class="doc-item-desc">' + CCE.markdown.esc(descTrunc) + '</div>'
                 : '') +

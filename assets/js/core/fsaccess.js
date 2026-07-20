@@ -114,17 +114,14 @@
       if (pi === -1) continue;
       var fname = f.name || parts[parts.length - 1];
       if (fname !== 'SKILL.md') continue;
-      // skills/<name>/SKILL.md  → length === pi+3, name = parts[pi+1]
-      // skills/<ns>/<name>/SKILL.md → length === pi+4, name = parts[pi+2]
-      var skillName;
-      if (parts.length === pi + 3 && parts[pi + 2] === 'SKILL.md') {
-        skillName = parts[pi + 1];
-      } else if (parts.length === pi + 4 && parts[pi + 3] === 'SKILL.md') {
-        skillName = parts[pi + 2];
-      } else {
-        continue;
-      }
-      out.push({ name: skillName, _file: f });
+      // Depth-agnostic: the skill name is the folder directly containing SKILL.md.
+      // When it nests deeper than skills/<name>/SKILL.md (e.g. a local plugin at
+      // skills/<ns>/skills/<name>/SKILL.md) the folder right after the first
+      // 'skills' segment is the namespace, and the skill loads as `ns:name`.
+      var skillName = parts[parts.length - 2];
+      if (!skillName || skillName === 'skills') continue;
+      var namespace = (parts.length > pi + 3) ? parts[pi + 1] : '';
+      out.push({ name: skillName, namespace: namespace, _file: f });
     }
     return out;
   }
@@ -369,7 +366,7 @@
   function listSkills() {
     var descs = skillsFromFileList(_files);
     return Promise.resolve(descs.map(function (d) {
-      return { name: d.name, read: function () { return d._file.text(); } };
+      return { name: d.name, namespace: d.namespace, read: function () { return d._file.text(); } };
     }));
   }
 
