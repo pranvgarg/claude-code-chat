@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="assets/css/tokens.css">
   <link rel="stylesheet" href="assets/css/shell.css">
   <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/vendor/prism.css">
 </head>
 <body>
 
@@ -169,6 +170,13 @@
     </div>
   </main>
 </div>
+
+<!-- Vendor libraries (UMD/global builds, offline-first — no CDN at runtime) -->
+<script src="assets/vendor/marked.min.js"></script>
+<script src="assets/vendor/purify.min.js"></script>
+<script src="assets/vendor/fuse.min.js"></script>
+<script src="assets/vendor/prism.min.js"></script>
+<script>if (window.Prism) Prism.manual = true;</script>
 
 <!-- Modules: core first, then app.js (defines CCE.router/CCE.app), then views.
      Views call CCE.router.register(...) at load, so app.js MUST precede them.

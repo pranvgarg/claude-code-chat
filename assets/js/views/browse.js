@@ -81,11 +81,19 @@
   /* ------------------------------------------------------------------ */
   function applyFilter(summaries) {
     var q = state.q.toLowerCase();
-    var d = q
-      ? summaries.filter(function (s) {
+    var d;
+    if (q) {
+      if (typeof Fuse !== 'undefined') {
+        var fuse = new Fuse(summaries, { keys: ['prompt', 'displayPath'], threshold: 0.4 });
+        d = fuse.search(state.q).map(function (r) { return r.item; });
+      } else {
+        d = summaries.filter(function (s) {
           return (s.prompt + ' ' + (s.displayPath || '')).toLowerCase().indexOf(q) !== -1;
-        })
-      : summaries.slice();
+        });
+      }
+    } else {
+      d = summaries.slice();
+    }
 
     if (state.sort === 'Cost') {
       d.sort(function (a, b) { return (b.cost || 0) - (a.cost || 0); });
