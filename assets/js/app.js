@@ -43,6 +43,23 @@
         }
       });
 
+      document.getElementById('btn-export-prefs')?.addEventListener('click', () => {
+        const blob = new Blob([CCE.store.exportPrefs()], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = 'explorer-prefs.json'; a.click();
+      });
+      const pf = document.getElementById('prefs-file');
+      document.getElementById('btn-import-prefs')?.addEventListener('click', () => pf.click());
+      pf?.addEventListener('change', async () => {
+        if (!pf.files[0]) return;
+        const ok = CCE.store.importPrefs(await pf.files[0].text());
+        if (ok) location.reload();
+      });
+      if (!CCE.store.available) {
+        // one-time, non-nagging notice that prefs won't persist for double-clicked files
+        console.warn('[CCE] Preferences will not persist in this browser for file:// — use Export prefs, or the launcher.');
+      }
+
       CCE.connect.init(function () { CCE.state.connected = true; showApp(); render(); });
     }
   };
