@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Explorer — Sessions (Cards)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root[data-theme="dark"] {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2333; --surface3: #21262d;
+    --border: #30363d; --text: #e6edf3; --text-muted: #8b949e;
+    --user-accent: #58a6ff; --assistant-accent: #d2a8ff; --tool-accent: #7ee787;
+    --thinking-accent: #f0883e; --system-accent: #f778ba;
+    --shadow: 0 4px 24px rgba(0,0,0,0.5); --shadow-sm: 0 1px 8px rgba(0,0,0,0.3);
+  }
+  :root[data-theme="light"] {
+    --bg: #ffffff; --surface: #f6f8fa; --surface2: #eef1f5; --surface3: #e8ecf0;
+    --border: #d0d7de; --text: #1f2328; --text-muted: #656d76;
+    --user-accent: #0969da; --assistant-accent: #8250df; --tool-accent: #1a7f37;
+    --thinking-accent: #bc4c00; --system-accent: #bf3989;
+    --shadow: 0 4px 24px rgba(0,0,0,0.1); --shadow-sm: 0 1px 8px rgba(0,0,0,0.06);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; font-size: 13px; }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    transition: width 0.2s;
+  }
+
+  .sidebar-header {
+    padding: 18px 16px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .app-logo {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 10px;
+  }
+
+  .logo-mark {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, var(--user-accent), var(--assistant-accent));
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .app-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.4;
+    letter-spacing: 0.01em;
+  }
+  .app-name small {
+    display: block;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  .path-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--text-muted);
+  }
+  .path-badge svg { flex-shrink: 0; }
+
+  .nav {
+    flex: 1;
+    padding: 10px 8px;
+    overflow-y: auto;
+  }
+
+  .nav-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 6px 8px 4px;
+    opacity: 0.6;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 13px;
+    font-weight: 500;
+    user-select: none;
+    border: 1px solid transparent;
+    margin-bottom: 1px;
+  }
+
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active {
+    background: rgba(88,166,255,0.12);
+    color: var(--user-accent);
+    border-color: rgba(88,166,255,0.2);
+  }
+  .nav-item .badge {
+    margin-left: auto;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 100px;
+    background: var(--surface2);
+    color: var(--text-muted);
+    font-weight: 600;
+    border: 1px solid var(--border);
+  }
+  .nav-item.active .badge {
+    background: rgba(88,166,255,0.15);
+    color: var(--user-accent);
+    border-color: rgba(88,166,255,0.25);
+  }
+
+  .sidebar-footer {
+    padding: 12px 8px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .footer-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 12px;
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+  }
+  .footer-btn:hover { background: var(--surface2); color: var(--text); }
+
+  /* ─── MAIN ─── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .topbar {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+
+  .search-wrap {
+    flex: 1;
+    max-width: 400px;
+    position: relative;
+  }
+
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+
+  .search-input {
+    width: 100%;
+    padding: 7px 12px 7px 34px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+    font-family: inherit;
+  }
+  .search-input:focus { border-color: var(--user-accent); }
+  .search-input::placeholder { color: var(--text-muted); }
+
+  .seg-control {
+    display: flex;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2px;
+    gap: 2px;
+  }
+  .seg-btn {
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    transition: all 0.15s;
+  }
+  .seg-btn.active {
+    background: var(--surface2);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .select-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .select-btn:hover { color: var(--text); border-color: var(--text-muted); }
+
+  /* Recent strip */
+  .recent-strip {
+    padding: 12px 20px 0;
+    flex-shrink: 0;
+  }
+  .strip-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    opacity: 0.7;
+  }
+  .strip-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    scrollbar-width: none;
+  }
+  .strip-scroll::-webkit-scrollbar { display: none; }
+
+  .recent-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    white-space: nowrap;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-muted);
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .recent-chip:hover { color: var(--text); border-color: var(--text-muted); }
+  .recent-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--user-accent); }
+
+  /* ─── CONTENT ─── */
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px 24px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .section-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    opacity: 0.7;
+  }
+  .section-count {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 10px;
+  }
+
+  .session-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .session-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    right: 0; height: 2px;
+    background: var(--user-accent);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .session-card:hover {
+    border-color: rgba(88,166,255,0.35);
+    box-shadow: var(--shadow-sm), 0 0 0 1px rgba(88,166,255,0.1);
+    transform: translateY(-1px);
+  }
+  .session-card:hover::before { opacity: 1; }
+
+  .card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .card-prompt {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.5;
+    flex: 1;
+    padding-right: 24px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .star-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px;
+    transition: color 0.15s;
+    flex-shrink: 0;
+    opacity: 0.4;
+  }
+  .star-btn:hover, .star-btn.starred { color: #f0883e; opacity: 1; }
+
+  .card-path {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    min-width: 0;
+  }
+  .card-path span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .card-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 12px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid transparent;
+  }
+  .chip.model { background: rgba(210,168,255,0.1); color: var(--assistant-accent); border-color: rgba(210,168,255,0.2); font-family: 'IBM Plex Mono', monospace; }
+  .chip.branch { background: rgba(126,231,135,0.1); color: var(--tool-accent); border-color: rgba(126,231,135,0.2); }
+  .chip.cost { background: rgba(240,136,62,0.1); color: var(--thinking-accent); border-color: rgba(240,136,62,0.2); font-family: 'IBM Plex Mono', monospace; }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+  }
+
+  .card-footer-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .card-footer-item svg { opacity: 0.6; }
+
+  .card-time { margin-left: auto; font-size: 11px; }
+
+  /* Placeholder tabs */
+  .placeholder-view {
+    display: none;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    color: var(--text-muted);
+    opacity: 0.5;
+  }
+  .placeholder-view.active { display: flex; }
+
+  @media (max-width: 768px) {
+    .sidebar { width: 48px; }
+    .sidebar .app-name, .sidebar .path-badge, .nav-label, .nav-item span, .sidebar-footer .footer-btn span { display: none; }
+    .nav-item { justify-content: center; }
+    .main .topbar { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-header">
+    <div class="app-logo">
+      <div class="logo-mark">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        </svg>
+      </div>
+      <div class="app-name">Claude Code Explorer <small>~/.claude</small></div>
+    </div>
+    <div class="path-badge">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      ~/.claude
+    </div>
+  </div>
+
+  <div class="nav">
+    <div class="nav-label">Navigation</div>
+    <div class="nav-item active" onclick="setNav(this,'sessions')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>Sessions</span>
+      <span class="badge">47</span>
+    </div>
+    <div class="nav-item" onclick="setNav(this,'usage')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span>Usage</span>
+    </div>
+    <div class="nav-item" onclick="setNav(this,'plans')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <span>Plans</span>
+      <span class="badge">8</span>
+    </div>
+    <div class="nav-item" onclick="setNav(this,'skills')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      <span>Skills</span>
+      <span class="badge">12</span>
+    </div>
+    <div class="nav-item" onclick="setNav(this,'commands')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      <span>Commands</span>
+      <span class="badge">6</span>
+    </div>
+    <div class="nav-item" onclick="setNav(this,'hooks')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+      <span>Hooks</span>
+      <span class="badge">4</span>
+    </div>
+    <div class="nav-item" onclick="setNav(this,'memory')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span>Memory</span>
+      <span class="badge">3</span>
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <button class="footer-btn" onclick="toggleTheme()">
+      <svg id="theme-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+      <span>Toggle theme</span>
+    </button>
+    <button class="footer-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <span>Reconnect folder</span>
+    </button>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" class="search-input" placeholder="Search all sessions…">
+    </div>
+    <div class="seg-control">
+      <button class="seg-btn active">Recent</button>
+      <button class="seg-btn">By project</button>
+    </div>
+    <button class="select-btn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      Sort: Date
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <button class="select-btn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      Filter
+    </button>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content" id="sessions-view">
+    <!-- Recently Viewed Strip -->
+    <div class="recent-strip">
+      <div class="strip-label">Recently viewed</div>
+      <div class="strip-scroll">
+        <div class="recent-chip"><span class="dot"></span>Refactor auth middleware</div>
+        <div class="recent-chip"><span class="dot"></span>Debug Prisma connection pool</div>
+        <div class="recent-chip"><span class="dot"></span>Add dark mode toggle</div>
+        <div class="recent-chip"><span class="dot"></span>Write unit tests for parser</div>
+        <div class="recent-chip"><span class="dot"></span>Deploy n8n workflow</div>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <span class="section-title">All sessions</span>
+      <span class="section-count">47 sessions</span>
+    </div>
+
+    <div class="cards-grid" id="cards-grid">
+      <!-- Cards rendered by JS -->
+    </div>
+  </div>
+
+  <!-- Placeholder for other tabs -->
+  <div class="placeholder-view" id="usage-view">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    <div style="font-size:14px">Usage dashboard — see usage-dashboard.html mockup</div>
+  </div>
+  <div class="placeholder-view" id="plans-view">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/></svg>
+    <div style="font-size:14px">Plans — 8 plan files found</div>
+  </div>
+  <div class="placeholder-view" id="skills-view">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+    <div style="font-size:14px">Skills — 12 skills installed</div>
+  </div>
+  <div class="placeholder-view" id="commands-view">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+    <div style="font-size:14px">Custom slash commands — 6 commands</div>
+  </div>
+  <div class="placeholder-view" id="hooks-view">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/></svg>
+    <div style="font-size:14px">Hooks — 4 hooks configured</div>
+  </div>
+  <div class="placeholder-view" id="memory-view">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+    <div style="font-size:14px">Memory files — CLAUDE.md and project instructions</div>
+  </div>
+</div>
+
+<script>
+  const sessions = [
+    { prompt: "Refactor the authentication middleware to use JWT tokens and add refresh token rotation", project: "~/Developer/saas-platform", time: "2h ago", msgs: 34, model: "claude-opus-4-8", branch: "feat/auth-refactor", cost: "$0.84", size: "112 KB", starred: true },
+    { prompt: "Debug the Prisma connection pool exhaustion issue in production — getting ECONNREFUSED under load", project: "~/Developer/saas-platform", time: "5h ago", msgs: 28, model: "claude-sonnet-4-6", branch: "main", cost: "$0.42", size: "87 KB", starred: false },
+    { prompt: "Build a dark mode toggle with system preference detection and localStorage persistence", project: "~/Developer/claude-code-chat", time: "Yesterday", msgs: 19, model: "claude-sonnet-4-6", branch: "feat/dark-mode", cost: "$0.18", size: "44 KB", starred: false },
+    { prompt: "Write comprehensive unit tests for the JSONL parser including edge cases and malformed input", project: "~/Developer/claude-code-chat", time: "Yesterday", msgs: 41, model: "claude-opus-4-8", branch: "test/parser", cost: "$1.12", size: "203 KB", starred: true },
+    { prompt: "Set up n8n workflow for automated GitHub issue triage with Claude API integration", project: "~/Developer/automation", time: "2 days ago", msgs: 22, model: "claude-sonnet-4-6", branch: "main", cost: "$0.31", size: "68 KB", starred: false },
+    { prompt: "Implement streaming SSE endpoint for real-time chat updates with backpressure handling", project: "~/Developer/saas-platform", time: "3 days ago", msgs: 56, model: "claude-opus-4-8", branch: "feat/streaming", cost: "$2.10", size: "388 KB", starred: false },
+    { prompt: "Create a drag-and-drop file upload component with progress indicators and error states", project: "~/Developer/design-system", time: "4 days ago", msgs: 31, model: "claude-sonnet-4-6", branch: "comp/upload", cost: "$0.55", size: "124 KB", starred: false },
+    { prompt: "Optimize the search index — full-text search queries taking 800ms, need to get under 100ms", project: "~/Developer/saas-platform", time: "5 days ago", msgs: 17, model: "claude-opus-4-8", branch: "perf/search-idx", cost: "$0.61", size: "98 KB", starred: false },
+    { prompt: "Design and implement a rate limiting middleware using Redis sorted sets", project: "~/Developer/api-gateway", time: "6 days ago", msgs: 24, model: "claude-sonnet-4-6", branch: "feat/rate-limit", cost: "$0.28", size: "71 KB", starred: false },
+    { prompt: "Migrate from webpack 4 to Vite — update all config files and fix module compatibility issues", project: "~/Developer/legacy-app", time: "1 week ago", msgs: 63, model: "claude-opus-4-8", branch: "migrate/vite", cost: "$3.40", size: "512 KB", starred: true },
+  ];
+
+  function renderCards() {
+    const grid = document.getElementById('cards-grid');
+    grid.innerHTML = sessions.map((s, i) => `
+      <div class="session-card" onclick="window.location.href='viewer.html'">
+        <div class="card-header">
+          <div class="card-prompt">${s.prompt}</div>
+          <button class="star-btn ${s.starred ? 'starred' : ''}" onclick="event.stopPropagation();this.classList.toggle('starred')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="${s.starred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </button>
+        </div>
+        <div class="card-path">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <span>${s.project}</span>
+        </div>
+        <div class="card-chips">
+          <span class="chip model">${s.model}</span>
+          <span class="chip branch">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+            ${s.branch}
+          </span>
+          <span class="chip cost">${s.cost}</span>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-item">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            ${s.msgs}
+          </span>
+          <span class="card-footer-item">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+            ${s.size}
+          </span>
+          <span class="card-time">${s.time}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  renderCards();
+
+  function setNav(el, view) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('[id$="-view"]').forEach(v => { v.style.display = 'none'; v.classList.remove('active'); });
+    const target = document.getElementById(view + '-view');
+    if (target) {
+      if (view === 'sessions') {
+        target.style.display = '';
+      } else {
+        target.style.display = 'flex';
+        target.classList.add('active');
+      }
+    }
+  }
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('cce-theme', next);
+    updateThemeIcon(next);
+  }
+
+  function updateThemeIcon(theme) {
+    const icon = document.getElementById('theme-icon');
+    if (theme === 'light') {
+      icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+    } else {
+      icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+    }
+  }
+
+  const saved = localStorage.getItem('cce-theme');
+  if (saved) { document.documentElement.setAttribute('data-theme', saved); updateThemeIcon(saved); }
+</script>
+</body>
+</html>
