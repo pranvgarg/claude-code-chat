@@ -1,56 +1,107 @@
 /* ============================================================
    CLAUDE CODE EXPLORER — tokens.css
-   CSS custom properties (design tokens), font stacks, grain overlay.
-   Ported verbatim from docs/mockups/sessions-v2.html.
-   NO values changed.
+   Design tokens: color, type scale, spacing, radius, shadow, motion.
+   The shared design-system layer — every view inherits from here.
    ============================================================ */
 
 :root {
-  --bg:        #0f1117;
-  --surface:   #161b22;
-  --surface-2: #1a202c;
-  --elevated:  #21272e;
-  --border:    #2d333b;
+  /* ---- Surfaces & text ---- */
+  --bg:         #0f1117;
+  --surface:    #161b22;
+  --surface-2:  #1a202c;
+  --elevated:   #21272e;
+  --border:     #2d333b;
   --border-soft:#242a31;
-  --text:      #e6e1dc;
-  --text-dim:  #a8aeb5;
-  --text-faint:#6e7681;
+  --text:       #e6e1dc;
+  --text-dim:   #a8aeb5;
+  --text-faint: #8a93a3; /* bumped from #6e7681 for AA contrast */
 
-  --accent:    #5b9dff;
-  --c-user:    #5b9dff;
-  --c-assistant:#c99bff;
-  --c-tool:    #6fe08a;
-  --c-thinking:#f0a24e;
-  --c-system:  #f778ba;
-  --c-cost:    #f0b354;
+  /* ---- Accent + role colors (grammar preserved) ---- */
+  --accent:     #5b9dff;
+  --c-user:     #5b9dff;     /* sonnet / blue   */
+  --c-assistant:#c99bff;     /* opus   / purple */
+  --c-tool:     #6fe08a;     /* green           */
+  --c-thinking: #f0a24e;     /* orange          */
+  --c-system:   #f778ba;     /* pink            */
+  --c-cost:     #f0b354;     /* amber           */
 
-  --font-display: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
-  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace;
-  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* ---- Fonts (system stack only — no @font-face, no webfont) ---- */
+  --font-display: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-ui:      system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono:    ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace;
 
-  --r: 10px;
+  /* ---- Modular type scale ---- */
+  --fs-xs:  11px;
+  --fs-sm:  12px;
+  --fs-md:  13.5px;
+  --fs-lg:  15px;
+  --fs-xl:  18px;
+  --fs-2xl: 26px;
+
+  /* ---- Modular line-heights ---- */
+  --lh-tight: 1.25;
+  --lh-snug:  1.4;
+  --lh-base:  1.55;
+  --lh-loose: 1.7;
+
+  /* ---- Modular spacing scale ---- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+
+  /* ---- Modular radii ---- */
+  --r-xs: 5px;
   --r-sm: 7px;
-  --shadow: 0 1px 3px rgba(0,0,0,.3), 0 8px 24px -10px rgba(0,0,0,.5);
+  --r:    10px;   /* legacy alias */
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 16px;
+
+  /* ---- Modular shadow tiers ---- */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.25);
+  --shadow:    0 1px 3px rgba(0,0,0,.3), 0 8px 24px -10px rgba(0,0,0,.5); /* legacy alias */
+  --shadow-md: 0 4px 12px rgba(0,0,0,.28), 0 12px 32px -12px rgba(0,0,0,.5);
+  --shadow-lg: 0 12px 40px -12px rgba(0,0,0,.6);
+  --shadow-glow: 0 0 0 1px rgba(255,255,255,.04), 0 8px 32px -8px color-mix(in srgb, var(--accent) 30%, transparent);
+
+  /* ---- Motion tiers ---- */
+  --motion-fast:  .12s;
+  --motion-base:  .18s;
+  --motion-slow:  .5s;
+  --ease: cubic-bezier(.4, 0, .2, 1);
+
+  /* ---- Gradients (reused across views) ---- */
+  --grad-brand:  linear-gradient(150deg, var(--accent), var(--c-assistant));
+  --grad-aurora: radial-gradient(60% 60% at 25% 30%, color-mix(in srgb, var(--accent) 60%, transparent), transparent 70%),
+                 radial-gradient(55% 55% at 75% 70%, color-mix(in srgb, var(--c-assistant) 50%, transparent), transparent 70%);
 }
 
 [data-theme="light"] {
-  --bg:        #f5f3ef;
-  --surface:   #ffffff;
-  --surface-2: #faf8f4;
-  --elevated:  #ffffff;
-  --border:    #e2ddd3;
+  --bg:         #f5f3ef;
+  --surface:    #ffffff;
+  --surface-2:  #faf8f4;
+  --elevated:   #ffffff;
+  --border:     #e2ddd3;
   --border-soft:#ece7dd;
-  --text:      #1c2129;
-  --text-dim:  #5c6774;
-  --text-faint:#97a1af;
-  --accent:    #2f6fe0;
-  --c-user:    #2f6fe0;
+  --text:       #1c2129;
+  --text-dim:   #5c6774;
+  --text-faint: #7a8593; /* bumped for AA contrast */
+  --accent:     #2f6fe0;
+  --c-user:     #2f6fe0;
   --c-assistant:#8250df;
-  --c-tool:    #1a8f3c;
-  --c-thinking:#c1660c;
-  --c-system:  #bf3989;
-  --c-cost:    #b9791c;
-  --shadow: 0 1px 2px rgba(31,35,41,.06), 0 12px 28px -16px rgba(31,35,41,.22);
+  --c-tool:     #1a8f3c;
+  --c-thinking: #c1660c;
+  --c-system:   #bf3989;
+  --c-cost:     #b9791c;
+  --shadow:     0 1px 2px rgba(31,35,41,.06), 0 12px 28px -16px rgba(31,35,41,.22);
+  --shadow-md:  0 4px 12px rgba(31,35,41,.08), 0 12px 28px -16px rgba(31,35,41,.28);
+  --shadow-lg:  0 12px 40px -12px rgba(31,35,41,.25);
+  --shadow-glow: 0 0 0 1px rgba(31,35,41,.06), 0 8px 32px -8px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -61,8 +112,8 @@ body {
   font-family: var(--font-ui);
   background: var(--bg);
   color: var(--text);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: var(--fs-md);
+  line-height: var(--lh-base);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
@@ -79,3 +130,19 @@ body::after {
 }
 
 .hidden { display:none !important; }
+
+/* ============================================================
+   Reduced-motion guard
+   Every non-essential animation below is gated so users with
+   prefers-reduced-motion: reduce see static final states.
+   The @media (no-preference) blocks wrap animations in
+   components/view CSS files.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

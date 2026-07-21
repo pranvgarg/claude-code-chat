@@ -170,6 +170,11 @@
     sidebarOpen: false
   };
 
+  // Scroll listener for the progress bar + scroll-to-bottom FAB.
+  // Tracked at module scope so the next mount can remove it (the scroll
+  // container #view-root persists across route changes).
+  var _scrollHandler = null;
+
   /* ------------------------------------------------------------------ */
   /* Render helpers                                                       */
   /* ------------------------------------------------------------------ */
@@ -481,6 +486,86 @@
     if (search) {
       updateSearchNav(conv);
     }
+
+    // Inject copy buttons + language labels into every code block.
+    // Uses DOM construction (no inline onclick) so listeners are cleaned
+    // up when the conv element is replaced on next render.
+    injectCodeCopyButtons(conv);
+  }
+
+  function injectCodeCopyButtons(conv) {
+    var blocks = conv.querySelectorAll('.vwr-code-block');
+    blocks.forEach(function (block) {
+      // Skip if already augmented (re-render safety).
+      if (block.querySelector('.vwr-code-head')) return;
+
+      var codeEl = block.querySelector('code');
+      var lang = '';
+      if (codeEl) {
+        var cls = codeEl.className || '';
+        var m = cls.match(/language-([^\s]+)/);
+        if (m) lang = m[1];
+      }
+
+      var head = document.createElement('div');
+      head.className = 'vwr-code-head';
+
+      var langLabel = document.createElement('span');
+      langLabel.className = 'vwr-code-lang';
+      langLabel.textContent = lang || 'code';
+
+      var copyBtn = document.createElement('button');
+      copyBtn.className = 'vwr-code-copy';
+      copyBtn.type = 'button';
+      copyBtn.setAttribute('aria-label', 'Copy code to clipboard');
+      copyBtn.innerHTML = copyIconSVG();
+      copyBtn.addEventListener('click', function () {
+        var text = codeEl ? codeEl.textContent : '';
+        copyToClipboard(text).then(function () {
+          copyBtn.classList.add('copied');
+          copyBtn.innerHTML = checkIconSVG();
+          setTimeout(function () {
+            copyBtn.classList.remove('copied');
+            copyBtn.innerHTML = copyIconSVG();
+          }, 1400);
+        }).catch(function () { /* clipboard unavailable — silent */ });
+      });
+
+      head.appendChild(langLabel);
+      head.appendChild(copyBtn);
+      block.insertBefore(head, block.firstChild);
+    });
+  }
+
+  function copyIconSVG() {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<rect x="9" y="9" width="13" height="13" rx="2"/>' +
+      '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>' +
+      '</svg> Copy';
+  }
+  function checkIconSVG() {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+      '<polyline points="20 6 9 17 4 12"/>' +
+      '</svg> Copied';
+  }
+
+  function copyToClipboard(text) {
+    if (g.navigator && navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    // Fallback for file:// or older browsers.
+    return new Promise(function (resolve, reject) {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        resolve();
+      } catch (e) { reject(e); }
+    });
   }
 
   /* ------------------------------------------------------------------ */
@@ -602,9 +687,15 @@
             '<div class="vwr-sidebar-content" id="vwr-toc-content"></div>' +
           '</aside>' +
           '<div class="vwr-main">' +
+            '<div class="vwr-progress-track"><div class="vwr-progress-fill" id="vwr-progress-fill"></div></div>' +
             '<div class="vwr-session-meta" id="vwr-session-meta"></div>' +
             '<div id="vwr-subagents"></div>' +
             '<div class="vwr-conv" id="vwr-conv"></div>' +
+            '<button class="vwr-scroll-fab" id="vwr-scroll-fab" type="button" aria-label="Scroll to bottom">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+              '<polyline points="6 9 12 15 18 9"/>' +
+              '</svg>' +
+            '</button>' +
           '</div>' +
         '</div>';
 
@@ -612,6 +703,39 @@
       var tocContent = root.querySelector('#vwr-toc-content');
       var metaEl = root.querySelector('#vwr-session-meta');
       var subagentsEl = root.querySelector('#vwr-subagents');
+      var progressFill = root.querySelector('#vwr-progress-fill');
+      var scrollFab = root.querySelector('#vwr-scroll-fab');
+
+      /* ---- 3a. Wire scroll-progress + scroll-to-bottom FAB ---- */
+      // The scroll container is .content (#view-root), which persists across
+      // mounts. Track the handler so the next mount can remove it.
+      if (_scrollHandler) {
+        document.getElementById('view-root').removeEventListener('scroll', _scrollHandler);
+      }
+      var scroller = document.getElementById('view-root');
+      _scrollHandler = function () {
+        var max = scroller.scrollHeight - scroller.clientHeight;
+        if (max <= 0) {
+          if (progressFill) progressFill.style.width = '0%';
+          if (scrollFab) scrollFab.classList.remove('show');
+          return;
+        }
+        var pct = Math.min(100, Math.max(0, (scroller.scrollTop / max) * 100));
+        if (progressFill) progressFill.style.width = pct.toFixed(1) + '%';
+        // Show FAB when user has scrolled up more than 200px from the bottom.
+        var distanceFromBottom = max - scroller.scrollTop;
+        if (scrollFab) scrollFab.classList.toggle('show', distanceFromBottom > 200);
+      };
+      if (scroller) {
+        scroller.addEventListener('scroll', _scrollHandler, { passive: true });
+        // Initial paint.
+        _scrollHandler();
+      }
+      if (scrollFab) {
+        scrollFab.addEventListener('click', function () {
+          scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+        });
+      }
 
       /* ---- 4. Wire toolbar controls ---- */
       function reRender() {

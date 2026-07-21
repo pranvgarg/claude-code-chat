@@ -1,0 +1,103 @@
+/* ============================================================
+   views/cards.css
+   Shared primitives layer — used by Sessions, Dashboard, Plans,
+   Skills. Reusable design-system components. No view-specific
+   classes live here (those go in their own views/*.css).
+   ============================================================ */
+
+/* ---- Shared badges / chips ---- */
+.badge-model { font-family:var(--font-mono); font-size:var(--fs-xs); padding:2px 7px; border-radius:var(--r-xs); background: color-mix(in srgb, var(--c-assistant) 15%, transparent); color:var(--c-assistant); white-space:nowrap; }
+.badge-model.sonnet { background: color-mix(in srgb, var(--c-user) 15%, transparent); color:var(--c-user); }
+.chip-branch { font-family:var(--font-mono); font-size:var(--fs-xs); padding:2px 7px; border-radius:var(--r-xs); background: color-mix(in srgb, var(--c-tool) 13%, transparent); color:var(--c-tool); display:inline-flex; align-items:center; gap:4px; }
+
+/* ---- Shared bits ---- */
+.cost { font-family:var(--font-mono); color:var(--c-cost); }
+.path { font-family:var(--font-mono); font-size:11.5px; color:var(--text-faint); }
+.prompt { color:var(--text); }
+.meta-row { display:flex; align-items:center; gap:10px; font-family:var(--font-mono); font-size:var(--fs-xs); color:var(--text-faint); }
+.meta-row .sep { opacity:.4; }
+.star { color:var(--text-faint); cursor:pointer; }
+.star.on { color: var(--c-cost); }
+.star svg { width:15px; height:15px; display:block; }
+
+/* ============ GRID (rich cards) ============ */
+.view-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap:14px; }
+.card {
+  background: var(--surface); border:1px solid var(--border); border-radius: var(--r-md);
+  padding:15px 16px 13px; display:flex; flex-direction:column; gap:11px;
+  cursor:pointer; position:relative; transition: border-color var(--motion-fast) var(--ease), box-shadow var(--motion-fast) var(--ease);
+}
+/* Soft 2px top gradient strip replaces the heavy 3px left bar */
+.card::before {
+  content:""; position:absolute; left:14px; right:14px; top:0; height:2px;
+  border-radius:0 0 2px 2px;
+  background: linear-gradient(90deg, var(--c-user), color-mix(in srgb, var(--c-user) 40%, transparent));
+  opacity:.85;
+}
+.card.op::before { background: linear-gradient(90deg, var(--c-assistant), color-mix(in srgb, var(--c-assistant) 40%, transparent)); }
+@media (prefers-reduced-motion: no-preference) {
+  .card { transition: border-color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease), box-shadow var(--motion-fast) var(--ease); }
+  .card:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+}
+.card .top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; padding-left:8px; }
+.card .prompt { font-size:var(--fs-md); line-height:var(--lh-snug); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.card .path { padding-left:8px; }
+.card .tags { display:flex; gap:6px; flex-wrap:wrap; padding-left:8px; }
+.card .foot { display:flex; align-items:center; gap:10px; padding-left:8px; margin-top:2px; }
+.card .foot .cost { margin-left:auto; font-size:12.5px; }
+
+/* ============ LIST (dense table) ============ */
+.view-list { border:1px solid var(--border); border-radius:var(--r-md); overflow:hidden; }
+.lrow, .lhead { display:grid; grid-template-columns: 1fr 150px 96px 54px 74px 78px 32px; align-items:center; gap:14px; padding:0 16px; }
+.lhead { height:36px; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-faint); background:var(--surface-2); border-bottom:1px solid var(--border); }
+.lgroup { padding:9px 16px; background:color-mix(in srgb, var(--surface) 60%, transparent); border-bottom:1px solid var(--border-soft); display:flex; align-items:center; gap:9px; font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--text-dim); }
+.lgroup .g-cost { margin-left:auto; }
+.lgroup .g-count { color:var(--text-faint); }
+.lrow { height:42px; border-bottom:1px solid var(--border-soft); cursor:pointer; font-size:12.5px; transition:background var(--motion-fast); }
+.lrow:last-child { border-bottom:none; }
+.lrow:hover { background: var(--surface); }
+.lrow .l-prompt { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lrow .num, .lrow .cost, .lrow .mod { font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim); text-align:right; }
+.lrow .num { text-align:right; }
+
+/* ============ TILES (compact) ============ */
+.view-tiles { display:grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap:10px; }
+.tile {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r-sm);
+  padding:12px; cursor:pointer; display:flex; flex-direction:column; gap:8px; min-height:104px;
+  transition: border-color var(--motion-fast); position:relative;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tile { transition: border-color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease), box-shadow var(--motion-fast) var(--ease); }
+  .tile:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); transform:translateY(-2px); box-shadow:var(--shadow-md); }
+}
+.tile .t-dot { width:8px;height:8px;border-radius:2px; background:var(--c-user); }
+.tile.op .t-dot { background: var(--c-assistant); }
+.tile .t-title { font-size:var(--fs-sm); line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; color:var(--text); }
+.tile .t-foot { margin-top:auto; display:flex; align-items:center; justify-content:space-between; }
+.tile .t-proj { font-family:var(--font-mono); font-size:10px; color:var(--text-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:60%; }
+.tile .t-cost { font-family:var(--font-mono); font-size:var(--fs-xs); color:var(--c-cost); }
+
+/* ---- loading skeleton (gated shimmer) ---- */
+.skeleton { display:grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap:14px; }
+.sk { height:118px; border-radius:var(--r-md); background:var(--surface); border:1px solid var(--border); position:relative; overflow:hidden; }
+@media (prefers-reduced-motion: no-preference) {
+  .sk::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 6%, transparent), transparent); transform:translateX(-100%); animation:shimmer 1.3s infinite; }
+  @keyframes shimmer { to { transform:translateX(100%); } }
+}
+
+/* ---- empty state (shared illustration per use-site via class) ---- */
+.empty { text-align:center; padding:70px 20px; color:var(--text-faint); }
+.empty svg { width:44px;height:44px; opacity:.5; margin-bottom:14px; }
+.empty h3 {
+  font-family:var(--font-display); font-weight:600; font-size:var(--fs-xl);
+  color:var(--text-dim); margin-bottom:6px; letter-spacing:-.01em;
+}
+.empty p { font-size:var(--fs-sm); }
+
+/* ---- recently viewed strip ---- */
+.recent { display:flex; align-items:center; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+.recent .rlabel { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--text-faint); margin-right:2px; }
+.rpill { display:flex; align-items:center; gap:7px; background:var(--surface); border:1px solid var(--border-soft); border-radius:20px; padding:5px 12px 5px 10px; font-size:var(--fs-sm); color:var(--text-dim); cursor:pointer; transition: color var(--motion-fast), border-color var(--motion-fast); }
+.rpill:hover { color:var(--text); border-color:var(--border); }
+.rpill .rdot { width:6px;height:6px;border-radius:50%; }

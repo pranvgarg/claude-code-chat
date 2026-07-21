@@ -13,13 +13,43 @@
     const view = views[hash] || views['#/sessions'];
     const main = document.getElementById('view-root');
     if (!view || !CCE.state.connected) return;
-    document.querySelectorAll('.nav-item[data-hash]').forEach(n =>
-      n.classList.toggle('active', n.dataset.hash === hash));
+    document.querySelectorAll('.nav-item[data-hash]').forEach(n => {
+      const isActive = n.dataset.hash === hash;
+      n.classList.toggle('active', isActive);
+      // Reflect active state for assistive tech (mirrors the .active class).
+      if (isActive) n.setAttribute('aria-current', 'page');
+      else n.removeAttribute('aria-current');
+    });
     main.innerHTML = '';
     view.mount(main);
+    // Fade the freshly mounted view in (CSS handles the reduced-motion guard).
+    main.classList.remove('cce-view-in');
+    // Force reflow so the animation restarts on each navigation.
+    void main.offsetWidth;
+    main.classList.add('cce-view-in');
   }
   CCE.router = router;
   CCE.state = { connected: false };
+
+  // Populate the sidebar's Sessions count badge once sessions are loaded.
+  // Reads CCE.sessions.all() exposed by browse.js — safe to call anytime.
+  CCE.app = CCE.app || {};
+  CCE.app.updateNavCounts = function () {
+    var sessions = (CCE.sessions && CCE.sessions.all && CCE.sessions.all()) || null;
+    var badge = document.querySelector('.nav-item[data-hash="#/sessions"] .count');
+    if (badge && sessions) badge.textContent = String(sessions.length);
+  };
+
+  // Refresh the sidebar's connected-path text from fsaccess.
+  CCE.app.updateBrandPath = function () {
+    var el = document.getElementById('brand-path-text');
+    if (!el) return;
+    var path = (CCE.connect && typeof CCE.connect.getPath === 'function')
+      ? CCE.connect.getPath()
+      : '~/.claude';
+    el.textContent = path;
+    el.setAttribute('title', path);
+  };
 
   // Placeholder views for tabs not yet built (Phase 2-3). Without these, the
   // router would fall back to the Sessions view when they are clicked.
@@ -84,11 +114,24 @@
       }
 
       CCE.connect.init(function () { CCE.state.connected = true; showApp(); render(); });
+
+      // Listen for the sessions-loaded event (dispatched by browse.js) to
+      // populate the Sessions nav badge without coupling to browse internals.
+      window.addEventListener('cce:sessions-loaded', function (e) {
+        var badge = document.querySelector('.nav-item[data-hash="#/sessions"] .count');
+        if (badge && e.detail && typeof e.detail.count === 'number') {
+          badge.textContent = String(e.detail.count);
+        }
+      });
     }
   };
   function showApp() {
     document.getElementById('connect').style.display = 'none';
     document.getElementById('app').style.display = '';
+    // Now that we're connected, refresh the sidebar's path label.
+    if (CCE.app && typeof CCE.app.updateBrandPath === 'function') {
+      CCE.app.updateBrandPath();
+    }
   }
   g.addEventListener('DOMContentLoaded', function () { CCE.app.boot(); });
 

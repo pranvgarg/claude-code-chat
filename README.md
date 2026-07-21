@@ -30,6 +30,10 @@ The folder name is the absolute path of your project with slashes replaced by da
 
 ## Features
 
+### Connect screen
+
+The first-run experience is an aurora-lit card over a faint grid backdrop. Animated color blobs drift slowly behind the card (gated by `prefers-reduced-motion`), and the card itself has a subtle gradient border. All existing copy and CTAs (folder picker, single-file picker, privacy note, browser note) are preserved.
+
 ### Session Browser
 
 Three views for browsing sessions — switch with the List / Grid / Tiles toggle in the header:
@@ -37,7 +41,7 @@ Three views for browsing sessions — switch with the List / Grid / Tiles toggle
 | View | Description |
 |---|---|
 | **List** (default) | Compact rows with date, model, turn count, cost |
-| **Grid** | Cards with a session summary excerpt |
+| **Grid** | Cards with a soft top-gradient strip + session summary excerpt |
 | **Tiles** | Dense tile layout for high-volume browsing |
 
 - **Star sessions** — Click the star to favorite a session; favorites persist across browser restarts
@@ -51,20 +55,29 @@ Click any session to open it as a rendered conversation:
 
 - **Markdown rendering** — Assistant responses rendered with headings, bold, code blocks, tables (via vendored marked.js)
 - **Syntax highlighting** — Code blocks and tool inputs colored for 15+ languages (via vendored Prism.js)
+- **Copy button on every code block** — One-click copy with a "Copied" confirmation; language label shown in the code header row
 - **Thinking blocks** — Click to expand Claude's internal reasoning chain
 - **Tool calls** — Expand to see input and result; long outputs have a "Show full" toggle
 - **Token usage** — Input / output / cache counts per assistant turn
 - **Cost per turn** — Estimated cost shown on each assistant message
 - **DOMPurify sanitization** — All HTML content sanitized before render (vendored)
+- **Scroll-to-bottom FAB** — Appears after scrolling up >200px; smooth-scrolls back to the latest turn
+- **Scroll-progress bar** — A 2px gradient bar at the top of the viewer tracks reading position
+- **Resume state** — Filters, search, and TOC selections persist when you navigate away and come back
 
 ### Usage Dashboard
 
 The **Usage** tab shows aggregated statistics across all sessions in the picked folder:
 
-- Total spend by project
-- Token usage over time
-- Model breakdown (if multiple models used)
-- Session count and average cost
+- **4 stat cards** — Each with a gradient header band in its role color (cost / sessions / tokens / projects)
+- **Cost by project** — Gradient-filled bars; tooltips show exact spend
+- **7-day sparkline** — Inline SVG trend above the 14-day activity chart
+- **14-day activity** — Sessions per day, gradient bars with hover tooltips
+- **Most expensive sessions** — Top 6 by estimated cost, clickable into the viewer
+- **Total spend by project**
+- **Token usage over time**
+- **Model breakdown** (if multiple models used)
+- **Session count and average cost**
 
 ## Persistence
 
@@ -91,6 +104,36 @@ All libraries are vendored locally under `assets/vendor/` — no CDN calls, no n
 - `prism.min.js` + `prism.css` — Syntax highlighting
 
 The app works fully offline after first open. You can even copy the whole folder to a USB drive.
+
+## Visual System & CSS Architecture
+
+The stylesheet is layered — a shared design-system layer plus per-view scoped files:
+
+```
+assets/css/
+  tokens.css              Design tokens (colors, type scale, spacing, radii,
+                          shadows, motion). Dark + light themes.
+  shell.css               App frame: sidebar, nav, toolbar, content scroll.
+                          Active accent bar, hover gradient, focus-visible,
+                          aria-current style, collapsed-mode tooltips.
+  views/
+    connect.css           Connect screen (aurora, gradient-border card, pills)
+    cards.css             Shared primitives: .card, .view-list, .tile,
+                          .skeleton, .empty, .badge-*, .chip-branch
+    viewer.css            Conversation viewer (.vwr-*): bubbles, code blocks
+                          (copy button + lang label), thinking/tool blocks,
+                          scroll-progress bar, scroll-to-bottom FAB
+    dashboard.css         Usage dashboard (.dash-*): stat cards with
+                          gradient header bands, project bars, sparkline,
+                          activity chart, expensive-sessions table
+    docs.css              Plans & Skills (.doc-*): list + markdown body
+```
+
+**Conventions:**
+- View-specific classes are prefix-scoped (`vwr-`, `dash-`, `doc-`) so they don't collide across views.
+- Shared primitives (`.empty`, `.skeleton`, `.card`, `.star`, `.cost`) live in `cards.css` and are the design-system layer used by every view.
+- All animations are gated by `@media (prefers-reduced-motion: no-preference)`. Users with reduced motion enabled see static final states — shimmer, hover lifts, aurora drift, and view fade-in all stop automatically.
+- `--font-display` repointed to a refined system sans stack (was Georgia serif). No webfonts are loaded; `--font-mono` and `--font-ui` remain system stacks.
 
 ## Browser Support
 

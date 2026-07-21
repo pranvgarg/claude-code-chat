@@ -30,6 +30,11 @@
   // Each entry is { webkitRelativePath|relPath, name, text:()=>Promise<string> }
   var _files = [];
 
+  // Leaf name of the connected root folder (best-effort — browsers don't
+  // expose absolute paths for security). Set on connect; used by app.js to
+  // populate the sidebar brand-path.
+  var _rootName = '';
+
   // Cache for listPluginSkills — populated on first call, reused thereafter.
   var _pluginSkillsCache = null;
 
@@ -202,7 +207,15 @@
       var input = document.createElement('input');
       input.type = 'file';
       input.webkitdirectory = true;
-      input.onchange = function () { resolve(Array.from(input.files)); };
+      input.onchange = function () {
+        var files = Array.from(input.files);
+        // Derive root folder name from the first file's webkitRelativePath
+        // (e.g. ".claude/projects/.../x.jsonl" -> ".claude").
+        if (files.length > 0 && files[0].webkitRelativePath) {
+          _rootName = files[0].webkitRelativePath.split('/')[0] || _rootName;
+        }
+        resolve(files);
+      };
       input.oncancel = function () { reject(new Error('cancelled')); };
       input.click();
     });
@@ -294,6 +307,7 @@
       if (!handle) return null;
       return handle.queryPermission({ mode: 'read' }).then(function (perm) {
         if (perm !== 'granted') return null;
+        if (handle.name) _rootName = handle.name;
         return collectFromHandle(handle);
       });
     }).catch(function () { return null; });
@@ -302,6 +316,7 @@
   /* Show the showDirectoryPicker dialog, save handle, return files. */
   function connectViaFSA() {
     return g.showDirectoryPicker({ mode: 'read' }).then(function (handle) {
+      if (handle && handle.name) _rootName = handle.name;
       return saveHandle(handle).catch(function () { /* non-fatal */ })
         .then(function () { return collectFromHandle(handle); });
     });
@@ -512,6 +527,11 @@
           }
         });
       };
+    },
+    // Returns the leaf name of the connected root folder, or '~/.claude'
+    // as a friendly fallback when no name is available.
+    getPath: function () {
+      return _rootName || '~/.claude';
     }
   };
 

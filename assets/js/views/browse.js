@@ -460,6 +460,10 @@
           _cached = results;
           renderStage(stage, totalEl, eyebrowEl, _cached);
           renderRecentStrip(root.querySelector('#cce-recent'), _cached);
+          // Notify other modules (sidebar nav badges) that sessions are loaded.
+          if (typeof g.dispatchEvent === 'function') {
+            g.dispatchEvent(new CustomEvent('cce:sessions-loaded', { detail: { count: results.length } }));
+          }
         });
       }).catch(function (err) {
         console.error('[CCE browse] listSessions failed:', err);

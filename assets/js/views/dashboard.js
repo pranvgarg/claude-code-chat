@@ -143,42 +143,50 @@
 
       /* Card 1: Total Est. Cost */
       '<div class="dash-stat-card">' +
-        '<div class="dash-stat-label">' +
-          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>' +
-          'Total Est. Cost' +
+        '<div class="dash-stat-card-inner">' +
+          '<div class="dash-stat-label">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>' +
+            'Total Est. Cost' +
+          '</div>' +
+          '<div class="dash-stat-value">' + esc(fmtCost(data.totalCost)) + '</div>' +
+          '<div class="dash-stat-sub">across all sessions</div>' +
         '</div>' +
-        '<div class="dash-stat-value">' + esc(fmtCost(data.totalCost)) + '</div>' +
-        '<div class="dash-stat-sub">across all sessions</div>' +
       '</div>' +
 
       /* Card 2: Total Sessions */
       '<div class="dash-stat-card">' +
-        '<div class="dash-stat-label">' +
-          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' +
-          'Total Sessions' +
+        '<div class="dash-stat-card-inner">' +
+          '<div class="dash-stat-label">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' +
+            'Total Sessions' +
+          '</div>' +
+          '<div class="dash-stat-value">' + esc(String(data.totalSessions)) + '</div>' +
+          '<div class="dash-stat-sub">across <strong>' + esc(String(data.activeProjects)) + '</strong> projects</div>' +
         '</div>' +
-        '<div class="dash-stat-value">' + esc(String(data.totalSessions)) + '</div>' +
-        '<div class="dash-stat-sub">across <strong>' + esc(String(data.activeProjects)) + '</strong> projects</div>' +
       '</div>' +
 
       /* Card 3: Total Tokens */
       '<div class="dash-stat-card">' +
-        '<div class="dash-stat-label">' +
-          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>' +
-          'Total Tokens' +
+        '<div class="dash-stat-card-inner">' +
+          '<div class="dash-stat-label">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>' +
+            'Total Tokens' +
+          '</div>' +
+          '<div class="dash-stat-value">' + esc(fmtTokens(data.totalTokens)) + '</div>' +
+          '<div class="dash-stat-sub">estimated usage</div>' +
         '</div>' +
-        '<div class="dash-stat-value">' + esc(fmtTokens(data.totalTokens)) + '</div>' +
-        '<div class="dash-stat-sub">estimated usage</div>' +
       '</div>' +
 
       /* Card 4: Active Projects */
       '<div class="dash-stat-card">' +
-        '<div class="dash-stat-label">' +
-          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' +
-          'Active Projects' +
+        '<div class="dash-stat-card-inner">' +
+          '<div class="dash-stat-label">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' +
+            'Active Projects' +
+          '</div>' +
+          '<div class="dash-stat-value">' + esc(String(data.activeProjects)) + '</div>' +
+          '<div class="dash-stat-sub">avg <strong>' + esc(fmtCost(avgPerProject)) + '</strong> / project</div>' +
         '</div>' +
-        '<div class="dash-stat-value">' + esc(String(data.activeProjects)) + '</div>' +
-        '<div class="dash-stat-sub">avg <strong>' + esc(fmtCost(avgPerProject)) + '</strong> / project</div>' +
       '</div>' +
 
     '</div>';
@@ -194,10 +202,12 @@
     return projects.map(function (p, i) {
       var pct = Math.round((p.cost / maxCost) * 100);
       var color = PROJECT_COLORS[i % PROJECT_COLORS.length];
+      // Gradient fill — fades the role color toward transparent on the right.
+      var bg = 'linear-gradient(90deg, ' + color + ', color-mix(in srgb, ' + color + ' 35%, transparent))';
       return '<div class="dash-proj-row">' +
-        '<div class="dash-proj-name">' + esc(p.displayPath) + '</div>' +
+        '<div class="dash-proj-name" title="' + esc(p.displayPath) + '">' + esc(p.displayPath) + '</div>' +
         '<div class="dash-bar-track">' +
-          '<div class="dash-bar-fill" style="width:' + pct + '%;background:' + color + '"></div>' +
+          '<div class="dash-bar-fill" style="width:' + pct + '%;background:' + bg + '" title="' + esc(fmtCost(p.cost)) + '"></div>' +
         '</div>' +
         '<div class="dash-proj-cost">' + esc(fmtCost(p.cost)) + '</div>' +
       '</div>';
@@ -215,14 +225,49 @@
       var opacity = v > (maxVal * 0.6) ? '1' : v > (maxVal * 0.3) ? '0.6' : '0.3';
       var showLabel = (i % 2 === 0);
       var label = showLabel ? shortDayLabel(d) : '';
+      // Gradient bar fill (fades the user-color toward transparent on top).
+      var bg = 'linear-gradient(180deg, var(--c-user), color-mix(in srgb, var(--c-user) 45%, transparent))';
       return '<div class="dash-act-col">' +
         '<div class="dash-act-bar" ' +
-          'style="height:' + heightPct + 'px;background:var(--c-user);opacity:' + opacity + '" ' +
+          'style="height:' + heightPct + 'px;background:' + bg + ';opacity:' + opacity + '" ' +
           'title="' + esc(shortDayLabel(d)) + ': ' + esc(String(v)) + ' session' + (v !== 1 ? 's' : '') + '">' +
         '</div>' +
         '<span class="dash-act-label">' + esc(label) + '</span>' +
       '</div>';
     }).join('');
+  }
+
+  /* Inline SVG sparkline of the last 7 days' session counts.
+     Renders above the activity chart as a quick trend indicator. */
+  function renderSparkline(days14, dayCounts) {
+    var last7 = days14.slice(-7);
+    var values = last7.map(function (d) { return dayCounts[d] || 0; });
+    var maxVal = Math.max.apply(null, values);
+    var total = values.reduce(function (a, b) { return a + b; }, 0);
+    var W = 220, H = 32, PAD = 2;
+    var step = values.length > 1 ? (W - PAD * 2) / (values.length - 1) : 0;
+    var scale = maxVal > 0 ? (H - PAD * 2) / maxVal : 0;
+
+    // Build polyline points (top-aligned so 0 sits at the bottom).
+    var pts = values.map(function (v, i) {
+      var x = PAD + i * step;
+      var y = H - PAD - v * scale;
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    var pathD = 'M' + pts.join(' L');
+
+    // Filled area path (for the subtle gradient under the line).
+    var areaD = pathD + ' L' + (PAD + (values.length - 1) * step).toFixed(1) + ',' + (H - PAD) +
+                ' L' + PAD + ',' + (H - PAD) + ' Z';
+
+    return '<div class="dash-sparkline-row">' +
+      '<span class="dash-sparkline-label">7-day trend</span>' +
+      '<svg class="dash-sparkline-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+        '<path class="dash-sparkline-area" d="' + esc(areaD) + '"/>' +
+        '<path class="dash-sparkline-path" d="' + esc(pathD) + '"/>' +
+      '</svg>' +
+      '<span class="dash-sparkline-stat">' + esc(String(total)) + ' session' + (total !== 1 ? 's' : '') + ' · max ' + esc(String(maxVal)) + '/day</span>' +
+    '</div>';
   }
 
   function renderExpensiveTable(top6) {
@@ -290,6 +335,7 @@
             '<span class="dash-section-sub">sessions per day</span>' +
           '</div>' +
           '<div class="dash-act-wrap">' +
+            renderSparkline(data.days14, data.dayCounts) +
             '<div class="dash-act-grid">' +
               renderActivityBars(data.days14, data.dayCounts) +
             '</div>' +
