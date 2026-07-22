@@ -46,11 +46,65 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* YAML frontmatter helpers (shared by Skills / Memory / Commands)     */
+  /* ------------------------------------------------------------------ */
+  // Parse the leading `--- ... ---` block for `name` / `description`.
+  // Handles YAML folded/literal scalars (`>` / `|`) that continue on
+  // following indented lines.
+  function parseFrontmatter(text, fallbackName) {
+    var result = { name: fallbackName || '', description: '' };
+    if (typeof text !== 'string' || text.slice(0, 3) !== '---') return result;
+    var lines = text.split('\n');
+    var end = -1;
+    for (var i = 1; i < lines.length; i++) {
+      if (lines[i].trimRight() === '---') { end = i; break; }
+    }
+    if (end === -1) return result;
+    for (var j = 1; j < end; j++) {
+      var line = lines[j];
+      var colon = line.indexOf(':');
+      if (colon === -1) continue;
+      var key = line.slice(0, colon).trim();
+      var val = line.slice(colon + 1).trim();
+      if ((val.charAt(0) === '"' && val.charAt(val.length - 1) === '"') ||
+          (val.charAt(0) === "'" && val.charAt(val.length - 1) === "'")) {
+        val = val.slice(1, val.length - 1);
+      }
+      if (key === 'name') result.name = val || (fallbackName || '');
+      if (key === 'description') {
+        if (val === '' || val === '>' || val === '|' || val === '>-' || val === '|-') {
+          var collected = [];
+          var k = j + 1;
+          for (; k < end && /^\s+\S/.test(lines[k]); k++) collected.push(lines[k].trim());
+          val = collected.join(' ');
+          j = k - 1;
+        }
+        result.description = val;
+      }
+    }
+    return result;
+  }
+
+  // Remove the leading `--- ... ---` frontmatter block before rendering.
+  function stripFrontmatter(text) {
+    if (typeof text !== 'string' || text.slice(0, 3) !== '---') return text || '';
+    var lines = text.split('\n');
+    for (var i = 1; i < lines.length; i++) {
+      if (lines[i].trimRight() === '---') {
+        return lines.slice(i + 1).join('\n').replace(/^\n+/, '');
+      }
+    }
+    return text;
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Public surface                                                       */
   /* ------------------------------------------------------------------ */
   CCE.markdown = {
     render: render,
-    esc: esc
+    esc: esc,
+    parseFrontmatter: parseFrontmatter,
+    stripFrontmatter: stripFrontmatter
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : this);
