@@ -51,22 +51,8 @@
     el.setAttribute('title', path);
   };
 
-  // Placeholder views for tabs not yet built (Phase 2-3). Without these, the
-  // router would fall back to the Sessions view when they are clicked.
-  ['#/commands', '#/hooks', '#/memory'].forEach(function (h) {
-    var label = h.slice(2).charAt(0).toUpperCase() + h.slice(3);
-    router.register(h, {
-      title: label,
-      mount: function (root) {
-        var tb = document.querySelector('.toolbar');
-        if (tb) tb.innerHTML = '<div class="spacer"></div>';
-        root.innerHTML =
-          '<div class="empty" style="padding:80px 20px;text-align:center;color:var(--text-faint)">' +
-          '<h3 style="font-family:var(--font-display);font-style:italic;font-weight:400;font-size:22px;color:var(--text-dim);margin-bottom:8px">' + label + '</h3>' +
-          '<p>This section is coming in a later phase.</p></div>';
-      }
-    });
-  });
+  // All sidebar tabs now have real views (registered by their own view files
+  // which load after app.js). No placeholder routes remain.
 
   CCE.app = {
     boot() {
