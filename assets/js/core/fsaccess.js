@@ -37,6 +37,8 @@
 
   // Cache for listPluginSkills — populated on first call, reused thereafter.
   var _pluginSkillsCache = null;
+  // Cache for listPluginCommands — populated on first call, reused thereafter.
+  var _pluginCommandsCache = null;
 
   /* ------------------------------------------------------------------ */
   /* Pure helper: filter a flat file list down to session descriptors    */
@@ -174,6 +176,119 @@
       var skillName = parts[parts.length - 2] || 'unknown';
 
       out.push({ publisher: publisher, name: skillName, _file: f });
+    }
+    return out;
+  }
+
+  /* Pure helper: global memory files — root-level .md files NOT inside
+     projects/, plugins/, skills/, commands/, plans/, hooks/, or memory/.
+     Depth rule: parts = [rootName, filename] (length === 2) OR
+     parts = [filename] (length === 1).  No forbidden segments anywhere. */
+  var MEMORY_EXCL_SEGS = new Set([
+    'projects', 'plugins', 'skills', 'commands', 'plans', 'hooks', 'memory'
+  ]);
+  function globalMemoryFromFileList(fileList) {
+    var out = [];
+    for (var i = 0; i < fileList.length; i++) {
+      var f = fileList[i];
+      var parts = (f.webkitRelativePath || f.relPath || '').split('/');
+      var fname = f.name || parts[parts.length - 1];
+      if (!/\.md$/i.test(fname)) continue;
+      // Must be at depth 1 (just filename) or depth 2 (root-name + filename).
+      if (parts.length > 2) continue;
+      // No forbidden segment anywhere in the path.
+      var hasForbidden = false;
+      for (var j = 0; j < parts.length; j++) {
+        if (MEMORY_EXCL_SEGS.has(parts[j])) { hasForbidden = true; break; }
+      }
+      if (hasForbidden) continue;
+      out.push({ name: fname.replace(/\.md$/i, ''), _file: f });
+    }
+    return out;
+  }
+
+  /* Pure helper: per-project memory files at projects/<folder>/memory/<name>.md
+     (direct children of a 'memory' dir inside projects/<folder>). */
+  function memoryFromFileList(fileList) {
+    var out = [];
+    for (var i = 0; i < fileList.length; i++) {
+      var f = fileList[i];
+      var parts = (f.webkitRelativePath || f.relPath || '').split('/');
+      var pi = parts.indexOf('projects');
+      if (pi === -1) continue;
+      var fname = f.name || parts[parts.length - 1];
+      if (!/\.md$/i.test(fname)) continue;
+      // Must be: ..., 'projects', <folder>, 'memory', <file.md>
+      var projectFolder = parts[pi + 1];
+      if (!projectFolder) continue;
+      if (parts[pi + 2] !== 'memory') continue;
+      if (parts[pi + 3] !== fname) continue;
+      if (parts.length !== pi + 4) continue;
+      out.push({ projectFolder: projectFolder, name: fname.replace(/\.md$/i, ''), _file: f });
+    }
+    return out;
+  }
+
+  /* Pure helper: user commands at commands/<name>.md (direct children).
+     Excludes any path that contains a 'plugins' segment. */
+  function commandsFromFileList(fileList) {
+    var out = [];
+    for (var i = 0; i < fileList.length; i++) {
+      var f = fileList[i];
+      var parts = (f.webkitRelativePath || f.relPath || '').split('/');
+      // Exclude plugin paths.
+      var hasPlugins = false;
+      for (var j = 0; j < parts.length; j++) {
+        if (parts[j] === 'plugins') { hasPlugins = true; break; }
+      }
+      if (hasPlugins) continue;
+      var pi = parts.indexOf('commands');
+      if (pi === -1) continue;
+      var fname = f.name || parts[parts.length - 1];
+      if (!/\.md$/i.test(fname)) continue;
+      // Must be a DIRECT child of 'commands': parts[pi+1] === fname, length === pi+2
+      if (parts[pi + 1] !== fname) continue;
+      if (parts.length !== pi + 2) continue;
+      out.push({ name: fname.replace(/\.md$/i, ''), _file: f });
+    }
+    return out;
+  }
+
+  /* Pure helper: plugin commands — .md files whose immediate parent dir is
+     'commands' AND the path contains a 'plugins' segment.
+     Publisher derivation is the SAME generic logic as pluginSkillsFromFileList. */
+  function pluginCommandsFromFileList(fileList) {
+    var out = [];
+    for (var i = 0; i < fileList.length; i++) {
+      var f = fileList[i];
+      var parts = (f.webkitRelativePath || f.relPath || '').split('/');
+      // Must contain a 'plugins' segment.
+      var pluginsIdx = parts.indexOf('plugins');
+      if (pluginsIdx === -1) continue;
+      // Immediate parent folder must be 'commands'.
+      var fname = f.name || parts[parts.length - 1];
+      if (!/\.md$/i.test(fname)) continue;
+      if (parts[parts.length - 2] !== 'commands') continue;
+
+      // Derive publisher: same logic as pluginSkillsFromFileList.
+      var publisher = 'unknown';
+      var foundAnchor = false;
+      for (var k = pluginsIdx + 1; k < parts.length - 1; k++) {
+        if (parts[k] === 'cache' || parts[k] === 'marketplaces') {
+          if (k + 1 < parts.length - 1) {
+            publisher = parts[k + 1];
+          }
+          foundAnchor = true;
+          break;
+        }
+      }
+      if (!foundAnchor) {
+        if (pluginsIdx + 1 < parts.length - 1) {
+          publisher = parts[pluginsIdx + 1];
+        }
+      }
+
+      out.push({ publisher: publisher, name: fname.replace(/\.md$/i, ''), _file: f });
     }
     return out;
   }
@@ -412,15 +527,22 @@
             if (child.kind === 'directory') {
               if (PLUGIN_SKIP_DIRS.has(name)) return; // prune heavy/irrelevant dirs
               tasks.push(recurse(child, childPath));
-            } else if (name === 'SKILL.md') {
+            } else if (name === 'SKILL.md' || (
+                // Also keep .md files whose immediate parent dir is 'commands'
+                /\.md$/i.test(name) &&
+                (function () {
+                  var segs = childPath.split('/');
+                  return segs[segs.length - 2] === 'commands';
+                })()
+              )) {
               // Capture fileHandle in closure for lazy read.
-              (function (fileHandle, fp) {
+              (function (fileHandle, fp, n) {
                 result.push({
                   relPath: fp,
-                  name: 'SKILL.md',
+                  name: n,
                   text: function () { return fileHandle.getFile().then(function (f) { return f.text(); }); }
                 });
-              })(child, childPath);
+              })(child, childPath, name);
             }
           })(pairs[k][0], pairs[k][1]);
         }
@@ -483,6 +605,138 @@
     });
   }
 
+  /* listMemory — global and per-project memory .md files.
+     Returns Promise<{ global: [{name, read}], projects: [{projectFolder, displayPath, files:[{name,read}]}] }> */
+  function listMemory() {
+    var globalDescs = globalMemoryFromFileList(_files);
+    var projectDescs = memoryFromFileList(_files);
+
+    // Group project memory by projectFolder.
+    var byFolder = {};
+    for (var i = 0; i < projectDescs.length; i++) {
+      var d = projectDescs[i];
+      if (!byFolder[d.projectFolder]) byFolder[d.projectFolder] = [];
+      byFolder[d.projectFolder].push(d);
+    }
+
+    var projects = Object.keys(byFolder).map(function (folder) {
+      var displayPath = (CCE.sessionIndex && CCE.sessionIndex.projectDisplayPath)
+        ? CCE.sessionIndex.projectDisplayPath(folder)
+        : folder;
+      return {
+        projectFolder: folder,
+        displayPath: displayPath,
+        files: byFolder[folder].map(function (d) {
+          return { name: d.name, read: function () { return d._file.text(); } };
+        })
+      };
+    });
+
+    return Promise.resolve({
+      global: globalDescs.map(function (d) {
+        return { name: d.name, read: function () { return d._file.text(); } };
+      }),
+      projects: projects
+    });
+  }
+
+  /* listCommands — user command .md files from commands/<name>.md */
+  function listCommands() {
+    var descs = commandsFromFileList(_files);
+    return Promise.resolve(descs.map(function (d) {
+      return { name: d.name, read: function () { return d._file.text(); } };
+    }));
+  }
+
+  /* listPluginCommands — on-demand, lazy; cached after first call.
+     Returns Promise<[{ publisher, name, read:()=>Promise<string> }]>
+     Mirrors listPluginSkills but filters for plugin command .md files. */
+  function listPluginCommands() {
+    // 1. Picker mode: _files may already contain plugin command files.
+    var pickerDescs = pluginCommandsFromFileList(_files);
+    if (pickerDescs.length > 0) {
+      return Promise.resolve(pickerDescs.map(function (d) {
+        return {
+          publisher: d.publisher,
+          name: d.name,
+          read: function () { return d._file.text(); }
+        };
+      }));
+    }
+
+    // 2. Return cache if already populated.
+    if (_pluginCommandsCache !== null) {
+      return Promise.resolve(_pluginCommandsCache);
+    }
+
+    // 3. FSA mode: walk plugins/ on demand.
+    if (!g.indexedDB) {
+      _pluginCommandsCache = [];
+      return Promise.resolve(_pluginCommandsCache);
+    }
+
+    return loadHandle().then(function (root) {
+      if (!root) {
+        _pluginCommandsCache = [];
+        return _pluginCommandsCache;
+      }
+      return root.getDirectoryHandle('plugins').then(function (pluginsHandle) {
+        return collectPluginsFromHandle(pluginsHandle, 'plugins');
+      }).then(function (rawList) {
+        var descs = pluginCommandsFromFileList(rawList);
+        _pluginCommandsCache = descs.map(function (d) {
+          return {
+            publisher: d.publisher,
+            name: d.name,
+            read: function () { return d._file.text(); }
+          };
+        });
+        return _pluginCommandsCache;
+      }).catch(function () {
+        _pluginCommandsCache = [];
+        return _pluginCommandsCache;
+      });
+    }).catch(function () {
+      _pluginCommandsCache = [];
+      return _pluginCommandsCache;
+    });
+  }
+
+  /* readSettings — parse ~/.claude/settings.json.
+     Picker path: find the top-level settings.json in _files (no projects/plugins/skills segment).
+     FSA path: root.getFileHandle('settings.json').
+     Returns Promise<Object|null>. */
+  function readSettings() {
+    // Try picker-mode _files first.
+    for (var i = 0; i < _files.length; i++) {
+      var f = _files[i];
+      var fname = f.name || (f.relPath || f.webkitRelativePath || '').split('/').pop();
+      if (fname !== 'settings.json') continue;
+      var parts = (f.webkitRelativePath || f.relPath || '').split('/');
+      // Must be top-level: no forbidden segments.
+      var hasForbidden = false;
+      var SETTINGS_EXCL = ['projects', 'plugins', 'skills'];
+      for (var j = 0; j < parts.length; j++) {
+        if (SETTINGS_EXCL.indexOf(parts[j]) !== -1) { hasForbidden = true; break; }
+      }
+      if (hasForbidden) continue;
+      return f.text().then(function (txt) {
+        try { return JSON.parse(txt); } catch (_) { return null; }
+      });
+    }
+
+    // FSA path.
+    if (!g.indexedDB) return Promise.resolve(null);
+    return loadHandle().then(function (root) {
+      if (!root) return null;
+      return root.getFileHandle('settings.json').then(function (fh) {
+        return fh.getFile().then(function (file) { return file.text(); });
+      }).then(function (txt) {
+        try { return JSON.parse(txt); } catch (_) { return null; }
+      });
+    }).catch(function () { return null; });
+  }
+
   /* ------------------------------------------------------------------ */
   /* Public surface                                                       */
   /* ------------------------------------------------------------------ */
@@ -494,12 +748,20 @@
     listPlans: listPlans,
     listSkills: listSkills,
     listPluginSkills: listPluginSkills,
+    listMemory: listMemory,
+    listCommands: listCommands,
+    listPluginCommands: listPluginCommands,
+    readSettings: readSettings,
     // Exposed for unit testing only:
     _sessionsFromFileList: sessionsFromFileList,
     _subagentsFromFileList: subagentsFromFileList,
     _plansFromFileList: plansFromFileList,
     _skillsFromFileList: skillsFromFileList,
-    _pluginSkillsFromFileList: pluginSkillsFromFileList
+    _pluginSkillsFromFileList: pluginSkillsFromFileList,
+    _globalMemoryFromFileList: globalMemoryFromFileList,
+    _memoryFromFileList: memoryFromFileList,
+    _commandsFromFileList: commandsFromFileList,
+    _pluginCommandsFromFileList: pluginCommandsFromFileList
   };
 
   CCE.connect = {
