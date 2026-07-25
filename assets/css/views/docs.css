@@ -79,4 +79,55 @@
   background: var(--surface-2); border: 1px solid var(--border-soft);
   padding: 8px 10px; border-radius: 6px;
 }
+
+/* ---- Memory: attach/reconnect affordances ---- */
+.doc-attach-btn {
+  font-family: var(--font-ui); font-size: 11px; font-weight: 500;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: var(--r-sm); padding: 4px 9px; margin-left: auto;
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+.doc-attach-btn:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.doc-group-header .doc-attach-btn { font-size: 10.5px; padding: 3px 8px; }
+.doc-attach-btn-secondary {
+  color: var(--text-dim); background: var(--surface-2);
+  border-color: var(--border-soft);
+}
+.doc-attach-btn-secondary:hover { background: var(--surface); border-color: var(--border); }
+.doc-reconnect-btn {
+  color: var(--c-warn, #d29922);
+  background: color-mix(in srgb, var(--c-warn, #d29922) 10%, transparent);
+  border-color: color-mix(in srgb, var(--c-warn, #d29922) 30%, transparent);
+}
+
+.doc-empty .doc-attach-btn { margin: 14px auto 0; display: inline-block; }
+
+.doc-item-reconnect { display: flex; align-items: center; gap: 6px; color: var(--text-faint); cursor: default; }
+.doc-pill {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--c-warn, #d29922);
+  background: color-mix(in srgb, var(--c-warn, #d29922) 12%, transparent);
+  border-radius: var(--r-sm); padding: 1px 6px;
+}
+
+.doc-confirm-attach { max-width: 420px; margin: 40px auto; }
+.doc-confirm-attach h3 {
+  font-family: var(--font-display); font-weight: 600; font-size: var(--fs-xl);
+  color: var(--text); margin-bottom: 8px; letter-spacing: -.01em;
+}
+.doc-confirm-attach p { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; margin-bottom: 16px; }
+.doc-confirm-label { display: block; font-size: 11px; color: var(--text-faint); margin-bottom: 5px; }
+.doc-confirm-select, .doc-confirm-input {
+  width: 100%; font-family: var(--font-ui); font-size: 13px; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm); padding: 8px 10px; margin-bottom: 12px;
+}
+.doc-confirm-manual { margin-top: -4px; }
+.doc-confirm-actions { display: flex; gap: 8px; margin-top: 4px; }
+.doc-confirm-actions .doc-attach-btn { margin-left: 0; padding: 7px 14px; font-size: 12px; }
 .hooks-empty-event { font-size: 12px; color: var(--text-faint); font-style: italic; padding: 2px 0 4px; }

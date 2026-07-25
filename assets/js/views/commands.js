@@ -110,7 +110,8 @@
           }
 
           html +=
-            '<div class="doc-item" data-skill-idx="' + entryIdx + '">' +
+            '<div class="doc-item" data-skill-idx="' + entryIdx + '" data-open-key="' +
+            CCE.markdown.esc(cmd.name) + '">' +
             '<strong>' + CCE.markdown.esc('/' + cmd.name) + '</strong>' +
             '</div>';
         });
@@ -154,7 +155,8 @@
             var entryIdx = openables.length;
             openables.push({ read: cmd.read.bind(cmd) });
             html +=
-              '<div class="doc-item" data-skill-idx="' + entryIdx + '">' +
+              '<div class="doc-item" data-skill-idx="' + entryIdx + '" data-open-key="' +
+              CCE.markdown.esc(cmd.name) + '">' +
               CCE.markdown.esc('/' + cmd.name) +
               '</div>';
           });
@@ -164,8 +166,21 @@
 
         listEl.innerHTML = html;
 
-        /* Auto-open first user command if present; else show hint */
-        if (firstUserIdx !== -1) {
+        /* Deep link (?open=<name>) takes priority over the default auto-open */
+        var openKey = new URLSearchParams(location.hash.split('?')[1] || '').get('open');
+        var target = openKey
+          ? listEl.querySelector('[data-open-key="' + CSS.escape(openKey) + '"]')
+          : null;
+
+        if (target) {
+          var group = target.closest('.doc-group');
+          if (group) group.classList.add('open');
+          listEl.querySelectorAll('.doc-item').forEach(function (el) { el.classList.remove('active'); });
+          target.classList.add('active');
+          target.scrollIntoView({ block: 'nearest' });
+          openEntry(parseInt(target.getAttribute('data-skill-idx'), 10));
+        } else if (firstUserIdx !== -1) {
+          /* Auto-open first user command if present; else show hint */
           var firstItemEl = listEl.querySelector('[data-skill-idx="' + firstUserIdx + '"]');
           if (firstItemEl) firstItemEl.classList.add('active');
 

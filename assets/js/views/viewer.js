@@ -883,6 +883,9 @@
           return;
         }
         var projectFolder = parent.projectFolder;
+        if (CCE.app && typeof CCE.app.setActiveProject === 'function') {
+          CCE.app.setActiveProject(projectFolder);
+        }
 
         if (sub) {
           // Viewing a subagent transcript spawned inside this session.

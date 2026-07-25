@@ -232,7 +232,17 @@
         '</svg>' +
         '<h3>' + esc(msg) + '</h3>' +
         '<p>' + esc(sub) + '</p>' +
+        (state.q ? '<button class="empty-action" id="empty-clear-search">Clear search</button>' : '') +
         '</div>';
+      var clearBtn = stage.querySelector('#empty-clear-search');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+          state.q = '';
+          var qInput = document.querySelector('#cce-q');
+          if (qInput) qInput.value = '';
+          renderStage(stage, totalEl, eyebrowEl, summaries);
+        });
+      }
       return;
     }
 

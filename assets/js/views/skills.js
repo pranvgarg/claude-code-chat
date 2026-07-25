@@ -174,12 +174,14 @@
 
             var desc = item.fm.description;
             var descTrunc = desc.length > 90 ? desc.slice(0, 90) + '…' : desc;
+            var label = item.skill.namespace ? (item.skill.namespace + ':' + item.skill.name) : (item.fm.name || item.skill.name);
 
             if (firstUserIdx === -1) firstUserIdx = entryIdx;
 
             html +=
-              '<div class="doc-item" data-skill-idx="' + entryIdx + '">' +
-              '<strong>' + CCE.markdown.esc(item.skill.namespace ? (item.skill.namespace + ':' + item.skill.name) : (item.fm.name || item.skill.name)) + '</strong>' +
+              '<div class="doc-item" data-skill-idx="' + entryIdx + '" data-open-key="' +
+              CCE.markdown.esc(label) + '">' +
+              '<strong>' + CCE.markdown.esc(label) + '</strong>' +
               (descTrunc
                 ? '<div class="doc-item-desc">' + CCE.markdown.esc(descTrunc) + '</div>'
                 : '') +
@@ -217,8 +219,10 @@
             groupSkills.forEach(function (skill) {
               var entryIdx = openables.length;
               openables.push({ read: skill.read.bind(skill) });
+              var label = skill.namespace ? (skill.namespace + ':' + skill.name) : skill.name;
               html +=
-                '<div class="doc-item" data-skill-idx="' + entryIdx + '">' +
+                '<div class="doc-item" data-skill-idx="' + entryIdx + '" data-open-key="' +
+                CCE.markdown.esc(label) + '">' +
                 CCE.markdown.esc(skill.name) +
                 '</div>';
             });
@@ -228,8 +232,20 @@
 
           listEl.innerHTML = html;
 
-          /* Auto-open first user skill (cheap — we already have the text) */
-          if (firstUserIdx !== -1) {
+          /* Deep link (?open=<namespace:name>) takes priority over auto-open */
+          var openKey = new URLSearchParams(location.hash.split('?')[1] || '').get('open');
+          var target = openKey
+            ? listEl.querySelector('[data-open-key="' + CSS.escape(openKey) + '"]')
+            : null;
+
+          if (target) {
+            var group = target.closest('.doc-group');
+            if (group) group.classList.add('open');
+            setActive(target);
+            target.scrollIntoView({ block: 'nearest' });
+            openEntry(parseInt(target.getAttribute('data-skill-idx'), 10));
+          } else if (firstUserIdx !== -1) {
+            /* Auto-open first user skill (cheap — we already have the text) */
             var firstItemEl = listEl.querySelector('[data-skill-idx="' + firstUserIdx + '"]');
             if (firstItemEl) firstItemEl.classList.add('active');
 

@@ -28,7 +28,8 @@
         var listHTML = '';
         plans.forEach(function (plan, idx) {
           var cls = idx === 0 ? 'doc-item active' : 'doc-item';
-          listHTML += '<div class="' + cls + '" data-idx="' + idx + '">' + CCE.markdown.esc(plan.name) + '</div>';
+          listHTML += '<div class="' + cls + '" data-idx="' + idx + '" data-open-key="' +
+            CCE.markdown.esc(plan.name) + '">' + CCE.markdown.esc(plan.name) + '</div>';
         });
         docList.innerHTML = listHTML;
 
@@ -57,8 +58,18 @@
           });
         });
 
-        /* Auto-load first plan */
-        if (items.length > 0) {
+        /* Auto-load first plan, unless a deep link (?open=<name>) asks for another */
+        var openKey = (location.hash.split('?')[1] || '');
+        openKey = new URLSearchParams(openKey).get('open');
+        var target = openKey
+          ? docList.querySelector('[data-open-key="' + CSS.escape(openKey) + '"]')
+          : null;
+
+        if (target) {
+          var idx = parseInt(target.getAttribute('data-idx'), 10);
+          loadPlan(plans[idx], target);
+          target.scrollIntoView({ block: 'nearest' });
+        } else if (items.length > 0) {
           loadPlan(plans[0], items[0]);
         }
       }).catch(function (err) {

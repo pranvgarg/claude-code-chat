@@ -1,0 +1,35 @@
+/* ---- Command palette (Cmd/Ctrl+K) ---- */
+.pal-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  background: rgba(0, 0, 0, .5);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 12vh;
+}
+.pal-panel {
+  width: min(560px, 92vw); max-height: 60vh;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pal-panel { animation: pal-in var(--motion-base) var(--ease); }
+}
+@keyframes pal-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.pal-input {
+  width: 100%; font-family: var(--font-ui); font-size: var(--fs-lg); color: var(--text);
+  background: transparent; border: none; border-bottom: 1px solid var(--border-soft);
+  padding: 16px 18px; outline: none;
+}
+.pal-input::placeholder { color: var(--text-faint); }
+.pal-results { overflow-y: auto; padding: 6px; }
+.pal-item {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 9px 12px; border-radius: var(--r-sm); cursor: pointer;
+}
+.pal-item.active, .pal-item:hover { background: var(--surface-2); }
+.pal-item-label { font-size: var(--fs-md); color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-item-sub { font-size: var(--fs-xs); color: var(--text-faint); flex-shrink: 0; }
+.pal-empty { text-align: center; padding: 24px; color: var(--text-faint); font-size: var(--fs-sm); }

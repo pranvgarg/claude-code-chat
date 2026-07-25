@@ -20,6 +20,11 @@
       if (isActive) n.setAttribute('aria-current', 'page');
       else n.removeAttribute('aria-current');
     });
+    // Clear the project-context chip on every navigation; views that are
+    // project-scoped (viewer, memory) re-set it once their own data loads.
+    if (CCE.app && typeof CCE.app.clearActiveProject === 'function') {
+      CCE.app.clearActiveProject();
+    }
     main.innerHTML = '';
     view.mount(main);
     // Fade the freshly mounted view in (CSS handles the reduced-motion guard).
@@ -29,7 +34,7 @@
     main.classList.add('cce-view-in');
   }
   CCE.router = router;
-  CCE.state = { connected: false };
+  CCE.state = { connected: false, activeProject: null };
 
   // Populate the sidebar's Sessions count badge once sessions are loaded.
   // Reads CCE.sessions.all() exposed by browse.js — safe to call anytime.
@@ -51,11 +56,32 @@
     el.setAttribute('title', path);
   };
 
+  // Project-context chip: shows which project the current session/memory
+  // group belongs to. Set by viewer.js (session opened) and memory.js
+  // (project group expanded); cleared on navigation to a project-agnostic view.
+  CCE.app.setActiveProject = function (projectFolder) {
+    CCE.state.activeProject = projectFolder;
+    var chip = document.getElementById('brand-project-chip');
+    if (!chip) return;
+    if (!projectFolder) {
+      chip.style.display = 'none';
+      chip.textContent = '';
+      chip.title = '';
+      return;
+    }
+    var displayPath = (CCE.sessionIndex && CCE.sessionIndex.projectDisplayPath)
+      ? CCE.sessionIndex.projectDisplayPath(projectFolder)
+      : projectFolder;
+    chip.textContent = displayPath;
+    chip.title = displayPath;
+    chip.style.display = '';
+  };
+  CCE.app.clearActiveProject = function () { CCE.app.setActiveProject(null); };
+
   // All sidebar tabs now have real views (registered by their own view files
   // which load after app.js). No placeholder routes remain.
 
-  CCE.app = {
-    boot() {
+  CCE.app.boot = function () {
       // Theme: read from CCE.store if available, else fall back to localStorage
       var savedTheme;
       if (typeof CCE.store.get === 'function') {
@@ -109,7 +135,6 @@
           badge.textContent = String(e.detail.count);
         }
       });
-    }
   };
   function showApp() {
     document.getElementById('connect').style.display = 'none';

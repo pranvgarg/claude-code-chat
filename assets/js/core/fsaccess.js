@@ -229,6 +229,16 @@
     return out;
   }
 
+  /* Find a root-level CLAUDE.md in a collectFromHandle()-shaped file list.
+   * Root-depth only — does not recurse into subdirectories, to avoid
+   * picking up unrelated CLAUDE.md files nested in vendored deps etc. */
+  function findClaudeMd(files) {
+    for (var i = 0; i < files.length; i++) {
+      if (files[i].relPath === 'CLAUDE.md') return files[i];
+    }
+    return null;
+  }
+
   /* Pure helper: user commands at commands/<name>.md (direct children).
      Excludes any path that contains a 'plugins' segment. */
   function commandsFromFileList(fileList) {
@@ -354,27 +364,55 @@
     });
   }
 
-  function saveHandle(handle) {
+  function saveHandleAs(key, handle) {
     return openHandleDB().then(function (db) {
       return new Promise(function (resolve, reject) {
         var tx = db.transaction(IDB_STORE, 'readwrite');
-        var req = tx.objectStore(IDB_STORE).put(handle, IDB_KEY);
+        var req = tx.objectStore(IDB_STORE).put(handle, key);
         req.onsuccess = function () { resolve(); };
         req.onerror   = function (e) { reject(e.target.error); };
       });
     });
   }
 
-  function loadHandle() {
+  function loadHandleAs(key) {
     return openHandleDB().then(function (db) {
       return new Promise(function (resolve, reject) {
         var tx = db.transaction(IDB_STORE, 'readonly');
-        var req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+        var req = tx.objectStore(IDB_STORE).get(key);
         req.onsuccess = function (e) { resolve(e.target.result || null); };
         req.onerror   = function (e) { reject(e.target.error); };
       });
     });
   }
+
+  function deleteHandleAs(key) {
+    return openHandleDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(IDB_STORE, 'readwrite');
+        var req = tx.objectStore(IDB_STORE).delete(key);
+        req.onsuccess = function () { resolve(); };
+        req.onerror   = function (e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  /* All stored handle keys, e.g. ['root', 'project:-Users-me-Developer-app'] */
+  function listHandleKeys() {
+    return openHandleDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(IDB_STORE, 'readonly');
+        var req = tx.objectStore(IDB_STORE).getAllKeys();
+        req.onsuccess = function (e) { resolve(e.target.result || []); };
+        req.onerror   = function (e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function saveHandle(handle) { return saveHandleAs(IDB_KEY, handle); }
+  function loadHandle() { return loadHandleAs(IDB_KEY); }
+
+  var PROJECT_HANDLE_PREFIX = 'project:';
 
   /* Recursively collect {relPath, name, text} from a FileSystemDirectoryHandle */
   function collectFromHandle(dirHandle, prefix) {
@@ -434,6 +472,66 @@
       if (handle && handle.name) _rootName = handle.name;
       return saveHandle(handle).catch(function () { /* non-fatal */ })
         .then(function () { return collectFromHandle(handle); });
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Secondary project-folder roots (for reading a project's own          */
+  /* CLAUDE.md, which lives outside ~/.claude entirely)                   */
+  /* ------------------------------------------------------------------ */
+
+  /* Prompt for a project folder (no persistence yet — caller confirms which
+   * project it belongs to before it's saved, since the slug<->path match is
+   * only a guess). Returns { handle, files }. */
+  function pickProjectFolder() {
+    return g.showDirectoryPicker({ mode: 'read' }).then(function (handle) {
+      return collectFromHandle(handle).then(function (files) {
+        return { handle: handle, files: files };
+      });
+    });
+  }
+
+  /* Persist an already-picked handle under a confirmed project slug. */
+  function attachProjectFolder(projectFolder, handle) {
+    return saveHandleAs(PROJECT_HANDLE_PREFIX + projectFolder, handle)
+      .catch(function () { /* non-fatal */ });
+  }
+
+  /* Try to restore a previously attached project handle without prompting.
+   * Returns { handle, files } if permission is granted, or
+   * { handle, needsPermission: true } if it needs to be re-requested. */
+  function restoreProjectHandle(projectFolder) {
+    if (!g.indexedDB) return Promise.resolve(null);
+    return loadHandleAs(PROJECT_HANDLE_PREFIX + projectFolder).then(function (handle) {
+      if (!handle) return null;
+      return handle.queryPermission({ mode: 'read' }).then(function (perm) {
+        if (perm !== 'granted') return { handle: handle, needsPermission: true };
+        return collectFromHandle(handle).then(function (files) {
+          return { handle: handle, files: files };
+        });
+      });
+    }).catch(function () { return null; });
+  }
+
+  /* Re-request permission on an already-stored project handle (no fresh picker). */
+  function reconnectProjectHandle(projectFolder) {
+    return loadHandleAs(PROJECT_HANDLE_PREFIX + projectFolder).then(function (handle) {
+      if (!handle) throw new Error('No stored handle for ' + projectFolder);
+      return handle.requestPermission({ mode: 'read' }).then(function (perm) {
+        if (perm !== 'granted') throw new Error('Permission denied');
+        return collectFromHandle(handle).then(function (files) {
+          return { handle: handle, files: files };
+        });
+      });
+    });
+  }
+
+  /* All attached project-folder slugs, e.g. ['-Users-me-Developer-app'] */
+  function listAttachedProjectFolders() {
+    return listHandleKeys().then(function (keys) {
+      return keys
+        .filter(function (k) { return typeof k === 'string' && k.indexOf(PROJECT_HANDLE_PREFIX) === 0; })
+        .map(function (k) { return k.slice(PROJECT_HANDLE_PREFIX.length); });
     });
   }
 
@@ -619,24 +717,71 @@
       byFolder[d.projectFolder].push(d);
     }
 
-    var projects = Object.keys(byFolder).map(function (folder) {
-      var displayPath = (CCE.sessionIndex && CCE.sessionIndex.projectDisplayPath)
+    function displayPathFor(folder) {
+      return (CCE.sessionIndex && CCE.sessionIndex.projectDisplayPath)
         ? CCE.sessionIndex.projectDisplayPath(folder)
         : folder;
+    }
+
+    var projects = Object.keys(byFolder).map(function (folder) {
       return {
         projectFolder: folder,
-        displayPath: displayPath,
+        displayPath: displayPathFor(folder),
         files: byFolder[folder].map(function (d) {
           return { name: d.name, read: function () { return d._file.text(); } };
         })
       };
     });
 
-    return Promise.resolve({
-      global: globalDescs.map(function (d) {
-        return { name: d.name, read: function () { return d._file.text(); } };
-      }),
-      projects: projects
+    var byFolderProject = {};
+    projects.forEach(function (p) { byFolderProject[p.projectFolder] = p; });
+
+    // Merge in any attached project folders (a project's own root CLAUDE.md,
+    // which lives outside ~/.claude entirely and can never be found by the
+    // memory/*.md scan above).
+    return listAttachedProjectFolders().then(function (folders) {
+      return Promise.all(folders.map(function (folder) {
+        return restoreProjectHandle(folder).then(function (result) {
+          return { folder: folder, result: result };
+        });
+      }));
+    }).then(function (attachments) {
+      attachments.forEach(function (att) {
+        var folder = att.folder;
+        var result = att.result;
+        if (!result) return;
+
+        var fileEntry;
+        if (result.needsPermission) {
+          fileEntry = {
+            name: 'CLAUDE.md',
+            reconnectNeeded: true,
+            projectFolder: folder,
+            read: function () {
+              return Promise.reject(new Error('Permission revoked — click to reconnect'));
+            }
+          };
+        } else {
+          var claudeMdFile = findClaudeMd(result.files || []);
+          if (!claudeMdFile) return; // attached folder has no root CLAUDE.md
+          fileEntry = { name: 'CLAUDE.md', read: function () { return claudeMdFile.text(); } };
+        }
+
+        var group = byFolderProject[folder];
+        if (!group) {
+          group = { projectFolder: folder, displayPath: displayPathFor(folder), files: [] };
+          byFolderProject[folder] = group;
+          projects.push(group);
+        }
+        group.files.push(fileEntry);
+      });
+
+      return {
+        global: globalDescs.map(function (d) {
+          return { name: d.name, read: function () { return d._file.text(); } };
+        }),
+        projects: projects
+      };
     });
   }
 
@@ -752,6 +897,11 @@
     listCommands: listCommands,
     listPluginCommands: listPluginCommands,
     readSettings: readSettings,
+    pickProjectFolder: pickProjectFolder,
+    attachProjectFolder: attachProjectFolder,
+    restoreProjectHandle: restoreProjectHandle,
+    reconnectProjectHandle: reconnectProjectHandle,
+    listAttachedProjectFolders: listAttachedProjectFolders,
     // Exposed for unit testing only:
     _sessionsFromFileList: sessionsFromFileList,
     _subagentsFromFileList: subagentsFromFileList,
@@ -761,7 +911,8 @@
     _globalMemoryFromFileList: globalMemoryFromFileList,
     _memoryFromFileList: memoryFromFileList,
     _commandsFromFileList: commandsFromFileList,
-    _pluginCommandsFromFileList: pluginCommandsFromFileList
+    _pluginCommandsFromFileList: pluginCommandsFromFileList,
+    _findClaudeMd: findClaudeMd
   };
 
   CCE.connect = {
