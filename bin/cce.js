@@ -50,6 +50,10 @@ async function start() {
     detached: true,
     stdio: ['ignore', logFd, logFd],
   });
+  child.on('error', (err) => {
+    console.error('Failed to start server:', err.message);
+    process.exit(1);
+  });
   child.unref();
 
   state.write({ pid: child.pid, port, startedAt: Date.now() });
@@ -99,4 +103,7 @@ async function main() {
   else usage();
 }
 
-main();
+main().catch((err) => {
+  console.error('Error:', err.message);
+  process.exit(1);
+});
