@@ -20,10 +20,34 @@ function usage() {
 
 function runChildServer(port) {
   const server = createStaticServer(ROOT_DIR);
-  server.listen(port, '127.0.0.1');
+  server.listen(port, '127.0.0.1', () => {
+    if (process.send) process.send('ready');
+  });
   const shutdown = () => server.close(() => process.exit(0));
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
+}
+
+function waitForChildReady(child, timeoutMs) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      child.removeListener('message', onMessage);
+      child.removeListener('exit', onExit);
+      resolve();
+    };
+    const onMessage = (msg) => {
+      if (msg === 'ready') finish();
+    };
+    const onExit = () => finish();
+    const timer = setTimeout(finish, timeoutMs);
+    if (typeof timer.unref === 'function') timer.unref();
+    child.on('message', onMessage);
+    child.on('exit', onExit);
+  });
 }
 
 async function openBrowser(url) {
@@ -48,12 +72,15 @@ async function start() {
 
   const child = spawn(process.execPath, [__filename, `--internal-serve=${port}`], {
     detached: true,
-    stdio: ['ignore', logFd, logFd],
+    stdio: ['ignore', logFd, logFd, 'ipc'],
   });
   child.on('error', (err) => {
     console.error('Failed to start server:', err.message);
     process.exit(1);
   });
+
+  await waitForChildReady(child, 5000);
+  if (child.channel) child.disconnect();
   child.unref();
 
   state.write({ pid: child.pid, port, startedAt: Date.now() });
