@@ -80,6 +80,21 @@ async function start() {
   });
 
   await waitForChildReady(child, 5000);
+
+  if (child.exitCode !== null || child.signalCode !== null) {
+    let detail = '';
+    try {
+      detail = fs.readFileSync(LOG_FILE, 'utf8').trim().split('\n').slice(-5).join('\n');
+    } catch {
+      // ignore — log file may not exist or be readable
+    }
+    console.error(
+      `Server failed to start (exited with code ${child.exitCode}, signal ${child.signalCode}).`
+      + (detail ? `\nLast log output:\n${detail}` : '')
+    );
+    process.exit(1);
+  }
+
   if (child.channel) child.disconnect();
   child.unref();
 
