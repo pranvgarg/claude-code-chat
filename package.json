@@ -1,0 +1,21 @@
+{
+  "name": "harness-explorer",
+  "version": "0.1.0",
+  "description": "Zero-backend, zero-build local viewer for Claude Code session data.",
+  "bin": {
+    "cce": "./bin/cce.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "assets",
+    "index.html"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "open": "^10.1.1"
+  }
+}
