@@ -22,7 +22,12 @@ yarn-error.log*
 # --- Internal dev artifacts: kept LOCAL, not published to GitHub ---
 # Test suites and fixtures (run locally with `node --test test/`)
 # Exception: test/cli/** (npx-package CLI test suite) is tracked and published.
-test/
+# NOTE: excludes contents of test/ (test/*) rather than the directory itself
+# (test/) — git's directory-exclusion optimization skips re-descending into an
+# excluded directory even for negation patterns, which silently blocks `git add`
+# on any brand-new file under test/cli/ (already-tracked files are unaffected,
+# which is why this only surfaces when a new test file is added).
+test/*
 !test/cli/
 !test/cli/**
 # Design docs, mockups, specs, and implementation plans
