@@ -21,10 +21,14 @@ yarn-error.log*
 
 # --- Internal dev artifacts: kept LOCAL, not published to GitHub ---
 # Test suites and fixtures (run locally with `node --test test/`)
+# Exception: test/cli/** (npx-package CLI test suite) is tracked and published.
 test/
+!test/cli/
+!test/cli/**
 # Design docs, mockups, specs, and implementation plans
 docs/
 # Stray planning notes
 plan.md
 *.plan.md
 plans/
+.claude/
