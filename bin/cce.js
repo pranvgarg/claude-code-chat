@@ -31,7 +31,7 @@ function isValidPort(port) {
 }
 
 function runChildServer(port) {
-  const server = createStaticServer(ROOT_DIR);
+  const server = createStaticServer(ROOT_DIR, { allow: ['index.html', 'assets'] });
   server.listen(port, '127.0.0.1', () => {
     if (process.send) process.send('ready');
   });
