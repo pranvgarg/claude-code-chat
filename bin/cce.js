@@ -23,7 +23,10 @@ const LOG_FILE = path.join(STATE_DIR, 'cce.log');
 const state = createDaemonState(STATE_FILE);
 
 function usage() {
-  console.log('Usage: cce [start|stop|status]');
+  console.log('Usage: cce [start|stop|status] [--help] [--version]');
+  console.log('  start    Serve the explorer on http://localhost and open the browser');
+  console.log('  stop     Stop the background server');
+  console.log('  status   Show whether the server is running');
 }
 
 function isValidPort(port) {
@@ -201,6 +204,8 @@ async function main() {
   }
 
   const command = args[0] || 'start';
+  if (command === '--help' || command === '-h') { usage(); return; }
+  if (command === '--version' || command === '-v') { console.log(require('../package.json').version); return; }
   if (command === 'start') await start();
   else if (command === 'stop') await stop();
   else if (command === 'status') status();

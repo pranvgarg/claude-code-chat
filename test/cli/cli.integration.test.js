@@ -128,3 +128,20 @@ test('cce stop refuses to signal a pid whose recorded port is not responding', a
     fs.rmSync(stateDir, { recursive: true, force: true });
   }
 });
+
+test('--help, -h and --version exit 0 and print usage/version', () => {
+  const pkg = require('../../package.json');
+  for (const flag of ['--help', '-h']) {
+    const r = spawnSync(process.execPath, [CLI, flag], { encoding: 'utf8' });
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.match(r.stdout, /Usage: cce/);
+  }
+  const v = spawnSync(process.execPath, [CLI, '--version'], { encoding: 'utf8' });
+  assert.strictEqual(v.status, 0, v.stderr);
+  assert.strictEqual(v.stdout.trim(), pkg.version);
+});
+
+test('unknown command still exits 1', () => {
+  const r = spawnSync(process.execPath, [CLI, 'bogus'], { encoding: 'utf8' });
+  assert.strictEqual(r.status, 1);
+});

@@ -60,3 +60,13 @@ test('read treats a corrupt state file as absent instead of throwing', () => {
 
   fs.rmSync(file, { force: true });
 });
+
+test('write() creates the state file with owner-only permissions', () => {
+  if (process.platform === 'win32') return;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cce-state-'));
+  const file = path.join(dir, 'state.json');
+  createDaemonState(file).write({ pid: 1, port: 2, startedAt: 3 });
+  const mode = fs.statSync(file).mode & 0o777;
+  assert.strictEqual(mode, 0o600);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
