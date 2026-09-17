@@ -1,14 +1,24 @@
 # Claude Code Explorer
 
-A local, offline, zero-install explorer for your `~/.claude` folder. Open `index.html` in a browser, pick your `~/.claude` directory once, and browse all your Claude Code sessions — no server, no npm, no build step.
+A local, offline explorer for your `~/.claude` folder — browse sessions, usage, plans, skills, commands, hooks, and memory. All data reading and parsing happens client-side via the File System Access API; there is no server-side parsing.
 
 ## Quick Start
+
+**Option A — `npx` (recommended):**
+
+```bash
+npx harness-explorer
+```
+
+This starts a local static file server on an available port and opens your browser automatically. Use `cce stop` to stop it and `cce status` to check whether it's running (both installed alongside the `cce` binary).
+
+**Option B — open the file directly:**
 
 1. Double-click `index.html` (or `open index.html` from Terminal)
 2. Click **"Choose ~/.claude folder"** and select your `~/.claude` directory
 3. Browse sessions in List, Grid, or Tiles view
 
-That's it. Chrome and Edge remember your folder selection via the File System Access API — future visits skip the picker. Safari and Firefox will re-prompt each time (browser limitation).
+Either way, Chrome and Edge remember your folder selection via the File System Access API — future visits skip the picker. Safari and Firefox will re-prompt each time (browser limitation).
 
 ## On-Disk Layout
 
@@ -150,15 +160,11 @@ assets/css/
 
 ## Roadmap
 
-**Phase 1 (current):** Sessions, Viewer, Usage — all working offline from a picked `~/.claude`.
+**Phase 1 (current):** Sessions, Viewer, Usage, Plans, Skills, Commands, Hooks, and Memory — all working offline from a picked `~/.claude`, and all read/parsed client-side (no server-side parsing).
 
-**Placeholder tabs** (visible in UI but not yet implemented — future phases):
-- **Plans** — Browse `.claude/plans/` files
-- **Skills** — Browse `.claude/commands/` (slash command skills)
-- **Hooks** — View hook configuration from `settings.json`
-- **Memory** — Browse `CLAUDE.md` and project-level memory files
+**Shipped:** the `npx harness-explorer` / `cce` CLI (see Quick Start above) — a static file server with no dependencies beyond `open`, that only serves the app's own files. It still relies on the File System Access API in the browser to read `~/.claude`; it does not read or parse your data on the server side.
 
-**Phase 4 (planned):** `npx claude-viewer` — a localhost-only read-only server that unlocks MCP config viewing from `~/.claude.json` without requiring the browser folder picker. Will run on `localhost:3000` and auto-open the browser.
+**Future work:** adapters for other coding-agent session formats (Codex, Gemini, etc.), a command palette, and multi-root folder support for browsing a project's own `CLAUDE.md` alongside its auto-memory notes.
 
 ## Schema Reference
 

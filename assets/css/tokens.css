@@ -6,24 +6,25 @@
 
 :root {
   /* ---- Surfaces & text ---- */
-  --bg:         #0f1117;
-  --surface:    #161b22;
-  --surface-2:  #1a202c;
-  --elevated:   #21272e;
-  --border:     #2d333b;
-  --border-soft:#242a31;
-  --text:       #e6e1dc;
-  --text-dim:   #a8aeb5;
-  --text-faint: #8a93a3; /* bumped from #6e7681 for AA contrast */
+  /* Direction A "Quiet Slate" (superdesign palette exploration, .superdesign/tokens/palette-directions.md) */
+  --bg:         #101217;
+  --surface:    #171c26;
+  --surface-2:  #1d2330;
+  --elevated:   #232a35;
+  --border:     #242b35;
+  --border-soft:#1d242d;
+  --text:       #d0d5db;
+  --text-dim:   #949ca8;
+  --text-faint: #717d8e; /* AA-checked against --bg #101217 */
 
   /* ---- Accent + role colors (grammar preserved) ---- */
-  --accent:     #5b9dff;
-  --c-user:     #5b9dff;     /* sonnet / blue   */
-  --c-assistant:#c99bff;     /* opus   / purple */
-  --c-tool:     #6fe08a;     /* green           */
-  --c-thinking: #f0a24e;     /* orange          */
-  --c-system:   #f778ba;     /* pink            */
-  --c-cost:     #f0b354;     /* amber           */
+  --accent:     #6da2f0;
+  --c-user:     #6da2f0;     /* sonnet / blue   */
+  --c-assistant:#b2a0f8;     /* opus   / purple */
+  --c-tool:     #7dc994;     /* green           */
+  --c-thinking: #d69c65;     /* orange          */
+  --c-system:   #d977a9;     /* pink            */
+  --c-cost:     #d4a968;     /* amber           */
 
   /* ---- Fonts (system stack only — no @font-face, no webfont) ---- */
   --font-display: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -82,26 +83,27 @@
 }
 
 [data-theme="light"] {
-  --bg:         #f5f3ef;
-  --surface:    #ffffff;
-  --surface-2:  #faf8f4;
+  /* Direction D "Ink & Paper" (superdesign palette exploration, .superdesign/tokens/palette-directions.md) */
+  --bg:         #f9f7f2;
+  --surface:    #fdfcf9;
+  --surface-2:  #f4f2ec;
   --elevated:   #ffffff;
-  --border:     #e2ddd3;
-  --border-soft:#ece7dd;
-  --text:       #1c2129;
-  --text-dim:   #5c6774;
-  --text-faint: #7a8593; /* bumped for AA contrast */
-  --accent:     #2f6fe0;
-  --c-user:     #2f6fe0;
-  --c-assistant:#8250df;
-  --c-tool:     #1a8f3c;
-  --c-thinking: #c1660c;
-  --c-system:   #bf3989;
-  --c-cost:     #b9791c;
-  --shadow:     0 1px 2px rgba(31,35,41,.06), 0 12px 28px -16px rgba(31,35,41,.22);
-  --shadow-md:  0 4px 12px rgba(31,35,41,.08), 0 12px 28px -16px rgba(31,35,41,.28);
-  --shadow-lg:  0 12px 40px -12px rgba(31,35,41,.25);
-  --shadow-glow: 0 0 0 1px rgba(31,35,41,.06), 0 8px 32px -8px color-mix(in srgb, var(--accent) 22%, transparent);
+  --border:     #ddd9cf;      /* hairline-forward: more visible than the previous light border */
+  --border-soft:#e8e5db;
+  --text:       #2b2a28;
+  --text-dim:   #4a4a4a;
+  --text-faint: #757575;
+  --accent:     #2563eb;      /* clearly-interactive blue: drives nav active state + focus rings */
+  --c-user:     #4b7bbd;      /* muted vs. accent — quieter than a fully saturated blue */
+  --c-assistant:#8b74b8;      /* muted purple */
+  --c-tool:     #5a946a;      /* muted green */
+  --c-thinking: #c48645;      /* muted orange */
+  --c-system:   #b55d89;      /* muted pink */
+  --c-cost:     #a6793a;      /* muted amber */
+  --shadow:     0 1px 1px rgba(0,0,0,.04);
+  --shadow-md:  0 1px 2px rgba(0,0,0,.05), 0 0 0 1px rgba(0,0,0,.03);
+  --shadow-lg:  0 8px 20px -12px rgba(0,0,0,.12);
+  --shadow-glow: 0 0 0 1px rgba(37,99,235,.12), 0 3px 10px -4px rgba(37,99,235,.15);
 }
 
 * { margin:0; padding:0; box-sizing:border-box; }

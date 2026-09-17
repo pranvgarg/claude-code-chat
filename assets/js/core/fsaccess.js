@@ -453,17 +453,36 @@
     })(dirHandle, prefix).then(function () { return result; });
   }
 
-  /* Try to restore previously saved handle. Returns files array or null. */
+  /* Try to restore a previously saved root handle without prompting.
+   * Returns { files } if permission is granted, { needsPermission: true }
+   * if a handle exists but its permission wasn't carried over (can happen
+   * across reloads/navigations), or null if there's no saved handle. */
   function restoreFromHandle() {
     if (!g.indexedDB) return Promise.resolve(null);
     return loadHandle().then(function (handle) {
       if (!handle) return null;
       return handle.queryPermission({ mode: 'read' }).then(function (perm) {
-        if (perm !== 'granted') return null;
+        if (perm !== 'granted') return { needsPermission: true };
+        if (handle.name) _rootName = handle.name;
+        return collectFromHandle(handle).then(function (files) {
+          return { files: files };
+        });
+      });
+    }).catch(function () { return null; });
+  }
+
+  /* Re-request permission on the already-stored root handle (no fresh
+   * picker) — mirrors reconnectProjectHandle() below. Requires a user
+   * gesture (must be called from a click handler). */
+  function reconnectRootHandle() {
+    return loadHandle().then(function (handle) {
+      if (!handle) throw new Error('No stored root handle');
+      return handle.requestPermission({ mode: 'read' }).then(function (perm) {
+        if (perm !== 'granted') throw new Error('Permission denied');
         if (handle.name) _rootName = handle.name;
         return collectFromHandle(handle);
       });
-    }).catch(function () { return null; });
+    });
   }
 
   /* Show the showDirectoryPicker dialog, save handle, return files. */
@@ -543,8 +562,11 @@
     if (g.showDirectoryPicker) {
       // FSA available: try restoring first, then prompt.
       return restoreFromHandle().then(function (restored) {
-        if (restored) return restored;
-        return connectViaFSA().catch(function (err) {
+        if (restored && restored.files) return restored.files;
+        var next = (restored && restored.needsPermission)
+          ? reconnectRootHandle()
+          : connectViaFSA();
+        return next.catch(function (err) {
           // User cancelled FSA or permission denied — fall back to picker.
           if (err && err.name === 'AbortError') throw err; // propagate cancel
           return connectViaPicker();
@@ -558,11 +580,6 @@
   /* listSessions — public async API                                      */
   /* ------------------------------------------------------------------ */
   function listSessions() {
-    if (_isServer) {
-      return Promise.reject(new Error(
-        '[CCE] Server mode listSessions is not implemented in Phase 1.'
-      ));
-    }
     var descs = sessionsFromFileList(_files);
     var out = descs.map(function (d) {
       return {
@@ -920,18 +937,8 @@
       var btn = document.getElementById('btn-connect');
       if (!btn) return;
 
-      // On load: attempt silent restore (FSA handle with granted permission).
-      if (g.showDirectoryPicker && g.indexedDB) {
-        restoreFromHandle().then(function (restored) {
-          if (restored && restored.length > 0) {
-            _files = restored;
-            onConnected();
-          }
-        }).catch(function () { /* silent */ });
-      }
-
-      btn.onclick = function () {
-        acquireFiles().then(function (f) {
+      function connectFresh() {
+        return acquireFiles().then(function (f) {
           _files = f;
           onConnected();
         }).catch(function (err) {
@@ -939,7 +946,31 @@
             console.error('[CCE] connect failed:', err);
           }
         });
-      };
+      }
+      btn.onclick = connectFresh;
+
+      // On load: attempt silent restore (FSA handle with granted permission).
+      if (g.showDirectoryPicker && g.indexedDB) {
+        restoreFromHandle().then(function (restored) {
+          if (restored && restored.files) {
+            _files = restored.files;
+            onConnected();
+          } else if (restored && restored.needsPermission) {
+            // A previously-connected folder handle exists but its granted
+            // permission wasn't carried over this reload. requestPermission()
+            // needs a user gesture, so we can't silently re-grant it here —
+            // swap the button to a one-click reconnect instead of a full
+            // folder re-pick (mirrors the project-folder reconnect flow).
+            btn.textContent = 'Reconnect ~/.claude folder';
+            btn.onclick = function () {
+              reconnectRootHandle().then(function (files) {
+                _files = files;
+                onConnected();
+              }).catch(connectFresh);
+            };
+          }
+        }).catch(function () { /* silent */ });
+      }
     },
     // Returns the leaf name of the connected root folder, or '~/.claude'
     // as a friendly fallback when no name is available.

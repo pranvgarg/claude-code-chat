@@ -14,6 +14,9 @@
   "engines": {
     "node": ">=18"
   },
+  "scripts": {
+    "test": "node --test test/cli/*.test.js"
+  },
   "license": "MIT",
   "dependencies": {
     "open": "^10.1.1"

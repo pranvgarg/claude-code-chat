@@ -50,3 +50,13 @@ test('isAlive reflects real process liveness', () => {
   assert.strictEqual(child.status, 0);
   assert.strictEqual(state.isAlive(child.pid), false);
 });
+
+test('read treats a corrupt state file as absent instead of throwing', () => {
+  const file = tmpStateFile();
+  fs.writeFileSync(file, 'not json{', 'utf8');
+  const state = createDaemonState(file);
+
+  assert.strictEqual(state.read(), null);
+
+  fs.rmSync(file, { force: true });
+});
