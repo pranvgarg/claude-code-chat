@@ -14,7 +14,12 @@
         delete pending[m.id];
         if (m.error) p.reject(new Error(m.error)); else p.resolve(m.index);
       };
-      worker.onerror = function () { worker = null; };
+      worker.onerror = function () {
+        var ids = Object.keys(pending);
+        for (var j = 0; j < ids.length; j++) pending[ids[j]].reject(new Error('index worker failed'));
+        pending = {};
+        worker = null;
+      };
       return worker;
     }
     return function buildIndex(key, text) {
@@ -23,7 +28,12 @@
       return new Promise(function (resolve, reject) {
         var id = ++seq;
         pending[id] = { resolve: resolve, reject: reject };
-        w.postMessage({ id: id, key: key, text: text });
+        try {
+          w.postMessage({ id: id, key: key, text: text });
+        } catch (err) {
+          delete pending[id];
+          reject(err);
+        }
       });
     };
   }
