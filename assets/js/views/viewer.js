@@ -5,11 +5,7 @@
   /* ------------------------------------------------------------------ */
   /* Helpers                                                              */
   /* ------------------------------------------------------------------ */
-  function esc(s) {
-    var d = document.createElement('div');
-    d.textContent = String(s == null ? '' : s);
-    return d.innerHTML;
-  }
+  var esc = CCE.util.esc, debounce = CCE.util.debounce, fmtTime = CCE.util.fmtTime;
 
   function highlight(html, term) {
     if (!term) return html;
@@ -29,14 +25,6 @@
       '<span id="' + id + '-full" style="display:none">' + esc(t.slice(max)) + '</span>';
   }
 
-  function fmtTime(ts) {
-    if (!ts) return '';
-    try {
-      var d = new Date(ts);
-      return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    } catch (e) { return String(ts); }
-  }
-
   function relativeTimeDelta(prev, curr) {
     if (!prev || !curr) return '';
     var diff = new Date(curr) - new Date(prev);
@@ -44,16 +32,6 @@
     if (diff < 3600000) return Math.round(diff / 60000) + ' min later';
     if (diff < 86400000) return Math.round(diff / 3600000) + 'h later';
     return Math.round(diff / 86400000) + 'd later';
-  }
-
-  function debounce(fn, ms) {
-    var t;
-    return function () {
-      var args = arguments;
-      var ctx = this;
-      clearTimeout(t);
-      t = setTimeout(function () { fn.apply(ctx, args); }, ms);
-    };
   }
 
   /* ------------------------------------------------------------------ */
@@ -89,28 +67,10 @@
      - When DOMPurify IS present we sanitize the marked output before inserting it.
   */
   function renderMarkdown(text) {
-    if (!g.marked) {
-      // No markdown lib: plain escaped text
-      return esc(text);
-    }
-    try {
-      var renderer = new marked.Renderer();
-      renderer.code = function (code, lang) {
-        var language = lang || '';
-        var highlighted = highlightCode(code, language);
-        return '<pre class="vwr-code-block"><code class="language-' + esc(language) + '">' + highlighted + '</code></pre>';
-      };
-      var raw = marked.parse(text, { breaks: true, gfm: true, renderer: renderer });
-      // Sanitize or fall back to escaped plain text
-      if (g.DOMPurify) {
-        return DOMPurify.sanitize(raw, { ADD_ATTR: ['target'] });
-      } else {
-        // DOMPurify absent: discard raw HTML entirely, return escaped plain text
-        return esc(text);
-      }
-    } catch (e) {
-      return esc(text);
-    }
+    return CCE.markdown.render(text, { codeRenderer: function (code, lang) {
+      var language = lang || '';
+      return '<pre class="vwr-code-block"><code class="language-' + esc(language) + '">' + highlightCode(code, language) + '</code></pre>';
+    } });
   }
 
   /* ------------------------------------------------------------------ */
@@ -152,9 +112,10 @@
   function toggleBlock(id, headerEl) {
     var body = document.getElementById(id);
     if (!body) return;
-    body.classList.toggle('vwr-open');
+    var isNowOpen = body.classList.toggle('vwr-open');
     var chev = headerEl.querySelector('.vwr-chevron');
     if (chev) chev.classList.toggle('vwr-open');
+    headerEl.setAttribute('aria-expanded', String(isNowOpen));
   }
 
   /* ------------------------------------------------------------------ */
@@ -261,7 +222,7 @@
           var tid = 'vth-' + Math.random().toString(36).slice(2, 9);
           html +=
             '<div class="vwr-thinking-block">' +
-              '<div class="vwr-thinking-header" onclick="CCE.viewer._toggleBlock(\'' + tid + '\', this)">' +
+              '<div class="vwr-thinking-header" role="button" tabindex="0" aria-expanded="false" onclick="CCE.viewer._toggleBlock(\'' + tid + '\', this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();CCE.viewer._toggleBlock(\'' + tid + '\', this)}">' +
                 '<span class="vwr-chevron">&#9658;</span> Thinking (' + th.length.toLocaleString() + ' chars)' +
               '</div>' +
               '<div class="vwr-thinking-body" id="' + tid + '">' +
@@ -286,15 +247,22 @@
           highlightedInput = esc(writeHeader) + truncateWithExpand(writeContent, 3000, writeId);
         } else if (name === 'Write' && !search) {
           highlightedInput = lang ? highlightCode(inputStr, lang) : esc(inputStr);
+        } else if (search) {
+          highlightedInput = highlight(esc(inputStr), search);
+        } else if (lang) {
+          var MAX_HL = 3000;
+          highlightedInput = inputStr.length > MAX_HL
+            ? truncateWithExpand(inputStr, MAX_HL, tuid + '-in')
+            : highlightCode(inputStr, lang);
         } else {
-          highlightedInput = search ? highlight(esc(inputStr), search) : (lang ? highlightCode(inputStr, lang) : esc(inputStr));
+          highlightedInput = esc(inputStr);
         }
         var resultStr = result !== undefined
           ? (typeof result === 'string' ? result : JSON.stringify(result, null, 2))
           : null;
         html +=
           '<div class="vwr-tool-block">' +
-            '<div class="vwr-tool-header" onclick="CCE.viewer._toggleBlock(\'' + tuid + '\', this)">' +
+            '<div class="vwr-tool-header" role="button" tabindex="0" aria-expanded="false" onclick="CCE.viewer._toggleBlock(\'' + tuid + '\', this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();CCE.viewer._toggleBlock(\'' + tuid + '\', this)}">' +
               '<span class="vwr-chevron">&#9658;</span>' +
               '<span class="vwr-tool-name">' + esc(name) + '</span>' +
               '<span class="vwr-tool-summary">' + esc(summary) + '</span>' +
@@ -632,11 +600,28 @@
     return lines.join('\n');
   }
 
+  function exportHTML() {
+    var conv = document.getElementById('vwr-conv');
+    if (!conv) return;
+    var css = Array.from(document.styleSheets).map(function (s) {
+      try { return Array.from(s.cssRules).map(function (r) { return r.cssText; }).join('\n'); } catch (e) { return ''; }
+    }).join('\n');
+    var html = '<!doctype html><html data-theme="' + esc(document.documentElement.dataset.theme || 'dark') + '"><head><meta charset="utf-8"><title>Session export</title><style>' + css + '\nbody{overflow:auto}.vwr-scroll-fab{display:none}</style></head><body><div class="content"><div class="vwr-conv">' + conv.innerHTML + '</div></div></body></html>';
+    var blob = new Blob([html], { type: 'text/html' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'session.html'; a.click();
+  }
+
   /* ------------------------------------------------------------------ */
   /* View mount                                                           */
   /* ------------------------------------------------------------------ */
   CCE.router.register('#/viewer', {
     title: 'Viewer',
+    unmount: function () {
+      var scroller = document.getElementById('view-root');
+      if (scroller && _scrollHandler) scroller.removeEventListener('scroll', _scrollHandler);
+      _scrollHandler = null;
+    },
     mount: function (root) {
       /* ---- 1. Parse session id (+ optional subagent) from hash query ---- */
       var hash = location.hash || '';
@@ -677,7 +662,8 @@
           '<button class="vwr-btn" id="vwr-toc-btn">&#9776; TOC</button>' +
           '<button class="vwr-btn" id="vwr-expand-all">Expand All</button>' +
           '<button class="vwr-btn" id="vwr-collapse-all">Collapse All</button>' +
-          '<button class="vwr-btn" id="vwr-export-md">Export .md</button>';
+          '<button class="vwr-btn" id="vwr-export-md">Export .md</button>' +
+          '<button class="vwr-btn" id="vwr-export-html">Export .html</button>';
       }
 
       /* ---- 3. Build view structure ---- */
@@ -708,10 +694,7 @@
 
       /* ---- 3a. Wire scroll-progress + scroll-to-bottom FAB ---- */
       // The scroll container is .content (#view-root), which persists across
-      // mounts. Track the handler so the next mount can remove it.
-      if (_scrollHandler) {
-        document.getElementById('view-root').removeEventListener('scroll', _scrollHandler);
-      }
+      // mounts. Track the handler so unmount() can remove it.
       var scroller = document.getElementById('view-root');
       _scrollHandler = function () {
         var max = scroller.scrollHeight - scroller.clientHeight;
@@ -826,6 +809,9 @@
         setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
       });
 
+      var exportHtmlBtn = document.getElementById('vwr-export-html');
+      if (exportHtmlBtn) exportHtmlBtn.addEventListener('click', exportHTML);
+
       /* ---- 5. Load session data ---- */
       if (!id) {
         conv.innerHTML = '<div class="empty"><h3>No session selected</h3><p>Go back to Sessions and pick one.</p></div>';
@@ -931,6 +917,7 @@
   /* ------------------------------------------------------------------ */
   CCE.viewer = {
     exportMarkdown: exportMarkdown,
+    exportHTML: exportHTML,
     // Internal helpers exposed for inline onclick handlers
     _toggleBlock: toggleBlock,
     _showFull: function (id) {

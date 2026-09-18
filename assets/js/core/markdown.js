@@ -30,11 +30,17 @@
   /*   2. marked present, DOMPurify ABSENT   → escape only (never raw)  */
   /*   3. marked absent                      → escape only              */
   /* ------------------------------------------------------------------ */
-  function render(text) {
+  function render(text, opts) {
     if (typeof text !== 'string') text = String(text);
 
     if (g.marked && typeof g.marked.parse === 'function') {
-      var raw = g.marked.parse(text, { breaks: true, gfm: true });
+      var options = { breaks: true, gfm: true };
+      if (opts && typeof opts.codeRenderer === 'function' && typeof g.marked.Renderer === 'function') {
+        var r = new g.marked.Renderer();
+        r.code = function (code, lang) { return opts.codeRenderer(typeof code === 'object' ? code.text : code, typeof code === 'object' ? code.lang : lang); };
+        options.renderer = r;
+      }
+      var raw = g.marked.parse(text, options);
       if (g.DOMPurify && typeof g.DOMPurify.sanitize === 'function') {
         return g.DOMPurify.sanitize(raw, { ADD_ATTR: ['target'] });
       }
