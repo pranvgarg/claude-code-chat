@@ -145,3 +145,20 @@ test('unknown command still exits 1', () => {
   const r = spawnSync(process.execPath, [CLI, 'bogus'], { encoding: 'utf8' });
   assert.strictEqual(r.status, 1);
 });
+
+test('no-arg run serves in the foreground until SIGINT', async () => {
+  const env = { ...process.env, CCE_STATE_DIR: tmpStateDir(), CCE_NO_OPEN: '1' };
+  const child = spawn(process.execPath, [CLI], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  let out = '';
+  child.stdout.on('data', (d) => { out += d; });
+  const port = await waitFor(() => { const m = /localhost:(\d+)/.exec(out); return m ? Number(m[1]) : null; }, 5000);
+  const res = await get(port, '/');
+  assert.strictEqual(res.status, 200);
+  assert.match(out, /Ctrl\+C/);
+  const exited = new Promise((resolve) => child.on('exit', (code, signal) => resolve({ code, signal })));
+  child.kill('SIGINT');
+  const e = await exited;
+  assert.strictEqual(e.code, 0);
+  const after = await get(port, '/').catch(() => ({ status: 'closed' }));
+  assert.strictEqual(after.status, 'closed');
+});

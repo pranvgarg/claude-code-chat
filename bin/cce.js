@@ -24,9 +24,10 @@ const state = createDaemonState(STATE_FILE);
 
 function usage() {
   console.log('Usage: cce [start|stop|status] [--help] [--version]');
-  console.log('  start    Serve the explorer on http://localhost and open the browser');
-  console.log('  stop     Stop the background server');
-  console.log('  status   Show whether the server is running');
+  console.log('  (no command)  Serve in the foreground, open the browser, stop with Ctrl+C');
+  console.log('  start         Serve in the background and open the browser');
+  console.log('  stop          Stop the background server');
+  console.log('  status        Show whether the background server is running');
 }
 
 function isValidPort(port) {
@@ -156,6 +157,32 @@ async function start() {
   console.log(`Started Claude Code Explorer at http://localhost:${port} (pid ${child.pid})`);
 }
 
+// Foreground mode: `cce` with no command. Serves in this process, prints the
+// URL, opens the browser, and stays up until Ctrl+C (SIGINT) or SIGTERM.
+async function serveForeground() {
+  const existing = state.read();
+  if (existing && state.isAlive(existing.pid)) {
+    console.log(`A background server is already running at http://localhost:${existing.port} (pid ${existing.pid}); run \`cce stop\` to stop it.`);
+  }
+  const port = await getPreferredPort(DEFAULT_PORT);
+  const server = createStaticServer(ROOT_DIR, { allow: ['index.html', 'assets'] });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', resolve);
+  });
+  const url = `http://localhost:${port}`;
+  console.log(`Claude Code Explorer running at ${url}`);
+  console.log('Press Ctrl+C to stop.');
+  if (!process.env.CCE_NO_OPEN) await openBrowser(url);
+  const shutdown = () => {
+    console.log('\nStopping.');
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 1000).unref();
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}
+
 async function stop() {
   const existing = state.read();
   if (!existing || !state.isAlive(existing.pid)) {
@@ -203,7 +230,8 @@ async function main() {
     return;
   }
 
-  const command = args[0] || 'start';
+  const command = args[0];
+  if (!command) { await serveForeground(); return; }
   if (command === '--help' || command === '-h') { usage(); return; }
   if (command === '--version' || command === '-v') { console.log(require('../package.json').version); return; }
   if (command === 'start') await start();
