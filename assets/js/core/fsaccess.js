@@ -443,7 +443,8 @@
               result.push({
                 relPath: childPath,
                 name: name,
-                text: function () { return child.getFile().then(function (f) { return f.text(); }); }
+                text: function () { return child.getFile().then(function (f) { return f.text(); }); },
+                stat: function () { return child.getFile().then(function (f) { return { size: f.size, lastModified: f.lastModified }; }); }
               });
             }
           })(pairs[k][0], pairs[k][1]);
@@ -576,19 +577,30 @@
     return connectViaPicker();
   }
 
+  /* Wrap a { id, projectFolder, _file } descriptor into the public shape
+   * consumed by callers of listSessions(): relPath, read() and stat().
+   * Handle-mode files (collectFromHandle) already provide their own
+   * stat(); picker-mode native File objects expose size/lastModified
+   * directly, so we fall back to those. */
+  function describeSession(d) {
+    var f = d._file;
+    return {
+      id: d.id,
+      projectFolder: d.projectFolder,
+      relPath: f.webkitRelativePath || f.relPath || '',
+      read: function () { return f.text(); },
+      stat: function () {
+        if (typeof f.stat === 'function') return f.stat();
+        return Promise.resolve({ size: f.size || 0, lastModified: f.lastModified || 0 });
+      }
+    };
+  }
+
   /* ------------------------------------------------------------------ */
   /* listSessions — public async API                                      */
   /* ------------------------------------------------------------------ */
   function listSessions() {
-    var descs = sessionsFromFileList(_files);
-    var out = descs.map(function (d) {
-      return {
-        id: d.id,
-        projectFolder: d.projectFolder,
-        read: function () { return d._file.text(); }
-      };
-    });
-    return Promise.resolve(out);
+    return Promise.resolve(sessionsFromFileList(_files).map(describeSession));
   }
 
   /* listSubagents — subagent transcripts spawned inside one session. */
@@ -929,7 +941,8 @@
     _memoryFromFileList: memoryFromFileList,
     _commandsFromFileList: commandsFromFileList,
     _pluginCommandsFromFileList: pluginCommandsFromFileList,
-    _findClaudeMd: findClaudeMd
+    _findClaudeMd: findClaudeMd,
+    _describeSession: describeSession
   };
 
   CCE.connect = {
