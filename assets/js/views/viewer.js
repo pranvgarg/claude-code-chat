@@ -462,11 +462,17 @@
       // up when the conv element is replaced on next render. Already-
       // augmented blocks (from a prior chunk) are skipped internally.
       injectCodeCopyButtons(conv);
-      if (_state.search) updateSearchNav(conv);
+      // Recompute matches/count/nav visibility for the newly rendered
+      // marks, but don't yank the viewport back to the active match while
+      // the user is scrolling to load this chunk lazily.
+      if (_state.search) updateSearchNav(conv, null, { scroll: false });
       return r.i < _state.entries.length;
     }
     var more = renderNext();
     if (opts.untilUuid) {
+      // If untilUuid never matches (e.g. a stale or unknown uuid), this
+      // renders every remaining chunk — the whole transcript ends up in
+      // the DOM with no sentinel/observer left to attach.
       while (more && !conv.querySelector('[data-uuid="' + CSS.escape(opts.untilUuid) + '"]')) more = renderNext();
     }
     if (more) {
@@ -559,7 +565,13 @@
   /* ------------------------------------------------------------------ */
   /* Search navigation                                                    */
   /* ------------------------------------------------------------------ */
-  function updateSearchNav(conv, navEl) {
+  // Recomputes _state.searchMatches, the active-match highlight and the
+  // count label/visibility of the nav UI. By default also scrolls the
+  // active match into view; pass { scroll: false } to skip that (used when
+  // a lazily-loaded chunk adds new marks and the user's own scroll should
+  // not be interrupted).
+  function updateSearchNav(conv, navEl, opts) {
+    opts = opts || {};
     var marks = Array.from((conv || document).querySelectorAll('.vwr-conv mark'));
     _state.searchMatches = marks;
     var navEl2 = navEl || document.getElementById('vwr-search-nav');
@@ -573,7 +585,9 @@
     for (var i = 0; i < marks.length; i++) marks[i].classList.remove('vwr-active-match');
     marks[_state.searchIndex].classList.add('vwr-active-match');
     if (countEl) countEl.textContent = (_state.searchIndex + 1) + ' of ' + marks.length;
-    marks[_state.searchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (opts.scroll !== false) {
+      marks[_state.searchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -882,7 +896,9 @@
           buildMeta(entries, prefixHtml);
           reRender();
           if (turn) {
-            renderConversation(conv, tocContent, { untilUuid: turn });
+            // reRender() above already called renderConversation with
+            // { untilUuid: turn }, so the target's chunk is already in the
+            // DOM — just look it up rather than rendering it again.
             var target = conv.querySelector('[data-uuid="' + CSS.escape(turn) + '"]');
             if (target) {
               target.classList.add('vwr-target');
