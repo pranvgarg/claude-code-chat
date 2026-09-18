@@ -5,7 +5,6 @@
   /* ------------------------------------------------------------------ */
   /* Shared session store (Task 8) — replaces the old module-level cache */
   /* ------------------------------------------------------------------ */
-  CCE.sessions = { all: function () { return CCE.sessionStore.all(); } }; // compatibility alias
   function cachedSessions() { return CCE.sessionStore.all(); }
 
   /* ------------------------------------------------------------------ */
@@ -43,24 +42,13 @@
   /* ------------------------------------------------------------------ */
   /* State (per-mount; reset on each mount so navigation is clean)       */
   /* ------------------------------------------------------------------ */
-  var state = { view: 'list', sort: 'Recent', group: 'By project', q: '', filters: { project: '', model: '', branch: '', days: 0, starred: false } };
+  var state = { view: 'list', sort: 'Recent', group: 'By project', filters: { project: '', model: '', branch: '', days: 0, starred: false } };
 
   /* ------------------------------------------------------------------ */
   /* Data filter / sort                                                   */
   /* ------------------------------------------------------------------ */
-  var _fuse = null, _fuseSource = null;
-
   function applyFilter(summaries) {
     var f = state.filters, d = summaries.slice();
-    if (state.q) {
-      if (typeof Fuse !== 'undefined') {
-        if (_fuseSource !== summaries) { _fuse = new Fuse(summaries, { keys: ['prompt', 'displayPath'], threshold: 0.4 }); _fuseSource = summaries; }
-        d = _fuse.search(state.q).map(function (r) { return r.item; });
-      } else {
-        var q = state.q.toLowerCase();
-        d = d.filter(function (s) { return (s.prompt + ' ' + (s.displayPath || '')).toLowerCase().indexOf(q) !== -1; });
-      }
-    }
     if (f.project) d = d.filter(function (s) { return s.projectFolder === f.project; });
     if (f.model) d = d.filter(function (s) { return modelClass(s.model) === f.model; });
     if (f.branch) d = d.filter(function (s) { return s.branch === f.branch; });
@@ -370,7 +358,6 @@
       state.view  = CCE.store.get('view', 'list');
       state.sort  = 'Recent';
       state.group = CCE.store.get('group', 'By project');
-      state.q     = '';
       state.filters = { project: '', model: '', branch: '', days: 0, starred: false };
 
       /* Update seg toggle buttons */
@@ -475,6 +462,9 @@
           '<p>' + esc(err && err.message ? err.message : String(err)) + '</p>' +
           '</div>';
       });
+    },
+    unmount: function () {
+      if (_pageObserver) { _pageObserver.disconnect(); _pageObserver = null; }
     }
   });
 
