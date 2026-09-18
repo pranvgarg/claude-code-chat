@@ -39,3 +39,6 @@ plan.md
 *.plan.md
 plans/
 .claude/
+
+# SuperDesign exploration scratch (decisions captured in tokens.css comments)
+.superdesign/

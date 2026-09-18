@@ -158,6 +158,8 @@ assets/css/
 
 `index-legacy-viewer.html` is the previous single-file viewer (loads one `.jsonl` at a time via drag-and-drop or file picker). It still works if you want a quick look at a single file without picking the whole `~/.claude` folder.
 
+`index-legacy-viewer.html` and `claude-conversation.schema.json` are kept in the repository for reference only; they are not part of the `npx harness-explorer` package.
+
 ## Roadmap
 
 **Phase 1 (current):** Sessions, Viewer, Usage, Plans, Skills, Commands, Hooks, and Memory — all working offline from a picked `~/.claude`, and all read/parsed client-side (no server-side parsing).

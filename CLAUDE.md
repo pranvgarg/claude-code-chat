@@ -10,7 +10,7 @@ Uses the default five-label vocabulary (needs-triage, needs-info, ready-for-agen
 
 ### Domain docs
 
-Single-context layout — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context layout. Product vision and non-negotiables live in `NORTHSTAR.md` at the repo root. Design specs and implementation plans live under `docs/superpowers/` (local, gitignored). See `docs/agents/domain.md` when present locally.
 
 ## Visual system
 
