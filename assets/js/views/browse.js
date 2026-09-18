@@ -9,38 +9,9 @@
   function cachedSessions() { return CCE.sessionStore.all(); }
 
   /* ------------------------------------------------------------------ */
-  /* Helpers                                                              */
+  /* Helpers (Task 3 shared util)                                         */
   /* ------------------------------------------------------------------ */
-  function esc(s) {
-    return String(s).replace(/[&<>"]/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-    });
-  }
-
-  function money(n) { return '$' + (n || 0).toFixed(2); }
-
-  function relTime(ts) {
-    if (!ts) return '';
-    var now = Date.now();
-    var ms = now - new Date(ts).getTime();
-    if (ms < 0) ms = 0;
-    var mins = Math.floor(ms / 60000);
-    var hrs  = Math.floor(ms / 3600000);
-    var days = Math.floor(ms / 86400000);
-    if (mins < 60)  return mins + 'm';
-    if (hrs  < 24)  return hrs  + 'h';
-    if (days < 7)   return days + 'd';
-    if (days < 14)  return '1w';
-    return Math.round(days / 7) + 'w';
-  }
-
-  /* Detect short model name ("opus" or "sonnet") from a full model id */
-  function modelClass(fullModel) {
-    if (!fullModel) return 'sonnet';
-    var m = String(fullModel).toLowerCase();
-    if (m.indexOf('opus') !== -1) return 'opus';
-    return 'sonnet';
-  }
+  var esc = CCE.util.esc, money = CCE.util.money, relTime = CCE.util.relTime, modelClass = CCE.util.modelClass;
 
   function starSVG(on) {
     return '<span class="star' + (on ? ' on' : '') + '">' +
@@ -66,100 +37,98 @@
       '</svg>' + esc(b) + '</span>';
   }
 
+  function promptLabel(s) { return s.empty ? 'Empty session' : esc(s.prompt); }
+  function costTitleAttr(s) { return s.unknownModel ? ' title="Estimated: unknown model rates"' : ''; }
+
   /* ------------------------------------------------------------------ */
   /* State (per-mount; reset on each mount so navigation is clean)       */
   /* ------------------------------------------------------------------ */
-  var state = {
-    view: 'list',
-    sort: 'Recent',
-    group: 'By project',
-    q: ''
-  };
+  var state = { view: 'list', sort: 'Recent', group: 'By project', q: '', filters: { project: '', model: '', branch: '', days: 0, starred: false } };
 
   /* ------------------------------------------------------------------ */
   /* Data filter / sort                                                   */
   /* ------------------------------------------------------------------ */
-  function applyFilter(summaries) {
-    var q = state.q.toLowerCase();
-    var d;
-    if (q) {
-      if (typeof Fuse !== 'undefined') {
-        var fuse = new Fuse(summaries, { keys: ['prompt', 'displayPath'], threshold: 0.4 });
-        d = fuse.search(state.q).map(function (r) { return r.item; });
-      } else {
-        d = summaries.filter(function (s) {
-          return (s.prompt + ' ' + (s.displayPath || '')).toLowerCase().indexOf(q) !== -1;
-        });
-      }
-    } else {
-      d = summaries.slice();
-    }
+  var _fuse = null, _fuseSource = null;
 
-    if (state.sort === 'Cost') {
-      d.sort(function (a, b) { return (b.cost || 0) - (a.cost || 0); });
-    } else if (state.sort === 'Messages') {
-      d.sort(function (a, b) { return (b.msgs || 0) - (a.msgs || 0); });
-    } else {
-      // Recent — newest lastTs first
-      d.sort(function (a, b) {
-        var ta = a.lastTs ? new Date(a.lastTs).getTime() : 0;
-        var tb = b.lastTs ? new Date(b.lastTs).getTime() : 0;
-        return tb - ta;
-      });
+  function applyFilter(summaries) {
+    var f = state.filters, d = summaries.slice();
+    if (state.q) {
+      if (typeof Fuse !== 'undefined') {
+        if (_fuseSource !== summaries) { _fuse = new Fuse(summaries, { keys: ['prompt', 'displayPath'], threshold: 0.4 }); _fuseSource = summaries; }
+        d = _fuse.search(state.q).map(function (r) { return r.item; });
+      } else {
+        var q = state.q.toLowerCase();
+        d = d.filter(function (s) { return (s.prompt + ' ' + (s.displayPath || '')).toLowerCase().indexOf(q) !== -1; });
+      }
     }
+    if (f.project) d = d.filter(function (s) { return s.projectFolder === f.project; });
+    if (f.model) d = d.filter(function (s) { return modelClass(s.model) === f.model; });
+    if (f.branch) d = d.filter(function (s) { return s.branch === f.branch; });
+    if (f.days) { var cutoff = Date.now() - f.days * 86400000; d = d.filter(function (s) { return s.lastTs && Date.parse(s.lastTs) >= cutoff; }); }
+    if (f.starred) d = d.filter(function (s) { return CCE.store.isFavorite(s.id); });
+    if (state.sort === 'Cost') d.sort(function (a, b) { return (b.cost || 0) - (a.cost || 0); });
+    else if (state.sort === 'Messages') d.sort(function (a, b) { return (b.msgs || 0) - (a.msgs || 0); });
+    else if (state.sort === 'Project') d.sort(function (a, b) { return String(a.displayPath).localeCompare(String(b.displayPath)) || tsOf(b) - tsOf(a); });
+    else d.sort(function (a, b) { return tsOf(b) - tsOf(a); });
     return d;
   }
+  function tsOf(s) { return s.lastTs ? Date.parse(s.lastTs) : 0; }
 
   /* ------------------------------------------------------------------ */
   /* Renderers (ported from docs/mockups/sessions-v2.html)               */
+  /* Each renderer is windowed: it renders d.slice(from, to) and only     */
+  /* emits the wrapper element on the first page (from === 0); later      */
+  /* pages return loose markup appended into the existing wrapper.        */
   /* ------------------------------------------------------------------ */
-  function renderGrid(d) {
-    return '<div class="view-grid">' +
-      d.map(function (s) {
-        var cls = modelClass(s.model) === 'opus' ? ' op' : '';
-        var fav = CCE.store.isFavorite(s.id);
-        return '<div class="card' + cls + '" data-id="' + esc(s.id) + '">' +
-          '<div class="top"><div class="prompt">' + esc(s.prompt) + '</div>' + starSVG(fav) + '</div>' +
-          '<div class="path">' + esc(s.displayPath || '') + '</div>' +
-          '<div class="tags">' + modelBadge(s.model) + branchChip(s.branch) + '</div>' +
-          '<div class="foot meta-row">' +
-          '<span>' + (s.msgs || 0) + ' msgs</span>' +
-          '<span class="sep">·</span>' +
-          '<span>' + relTime(s.lastTs) + '</span>' +
-          '<span class="cost">' + money(s.cost) + '</span>' +
-          '</div>' +
-          '</div>';
-      }).join('') +
-      '</div>';
+  function renderGrid(d, from, to) {
+    var body = d.slice(from, to).map(function (s) {
+      var cls = modelClass(s.model) === 'opus' ? ' op' : '';
+      if (s.empty) cls += ' is-empty';
+      var fav = CCE.store.isFavorite(s.id);
+      return '<div class="card' + cls + '" data-id="' + esc(s.id) + '" tabindex="0" role="button">' +
+        '<div class="top"><div class="prompt">' + promptLabel(s) + '</div>' + starSVG(fav) + '</div>' +
+        '<div class="path">' + esc(s.displayPath || '') + '</div>' +
+        '<div class="tags">' + modelBadge(s.model) + branchChip(s.branch) + '</div>' +
+        '<div class="foot meta-row">' +
+        '<span>' + (s.msgs || 0) + ' msgs</span>' +
+        '<span class="sep">·</span>' +
+        '<span>' + relTime(s.lastTs) + '</span>' +
+        '<span class="cost"' + costTitleAttr(s) + '>' + money(s.cost) + '</span>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+    return from === 0 ? '<div class="view-grid">' + body + '</div>' : body;
   }
 
   function rowHTML(s) {
     var fav = CCE.store.isFavorite(s.id);
     var proj = (s.displayPath || '').split('/').pop() || s.displayPath || '';
-    return '<div class="lrow" data-id="' + esc(s.id) + '">' +
-      '<span class="l-prompt">' + esc(s.prompt) + '</span>' +
+    var cls = s.empty ? ' is-empty' : '';
+    return '<div class="lrow' + cls + '" data-id="' + esc(s.id) + '" tabindex="0" role="button">' +
+      '<span class="l-prompt">' + promptLabel(s) + '</span>' +
       '<span class="path">' + esc(proj) + '</span>' +
       modelBadge(s.model) +
       '<span class="num">' + (s.msgs || 0) + '</span>' +
-      '<span class="cost" style="text-align:right">' + money(s.cost) + '</span>' +
+      '<span class="cost"' + costTitleAttr(s) + ' style="text-align:right">' + money(s.cost) + '</span>' +
       '<span class="mod">' + relTime(s.lastTs) + '</span>' +
       starSVG(fav) +
       '</div>';
   }
 
-  function renderList(d) {
-    var head = '<div class="lhead">' +
+  function renderList(d, from, to) {
+    var slice = d.slice(from, to);
+    var head = from === 0 ? '<div class="lhead">' +
       '<span>Prompt</span><span>Project</span><span>Model</span>' +
       '<span style="text-align:right">Msgs</span>' +
       '<span style="text-align:right">Cost</span>' +
       '<span style="text-align:right">Modified</span>' +
-      '<span></span></div>';
+      '<span></span></div>' : '';
 
     var rows;
     if (state.group === 'By project') {
       var groups = {};
       var order  = [];
-      d.forEach(function (s) {
+      slice.forEach(function (s) {
         var key = s.displayPath || s.projectFolder || '(unknown)';
         if (!groups[key]) { groups[key] = []; order.push(key); }
         groups[key].push(s);
@@ -178,27 +147,28 @@
         rows += items.map(rowHTML).join('');
       });
     } else {
-      rows = d.map(rowHTML).join('');
+      rows = slice.map(rowHTML).join('');
     }
 
-    return '<div class="view-list">' + head + rows + '</div>';
+    var body = head + rows;
+    return from === 0 ? '<div class="view-list">' + body + '</div>' : body;
   }
 
-  function renderTiles(d) {
-    return '<div class="view-tiles">' +
-      d.map(function (s) {
-        var cls = modelClass(s.model) === 'opus' ? ' op' : '';
-        var proj = (s.displayPath || '').split('/').pop() || s.displayPath || '';
-        return '<div class="tile' + cls + '" data-id="' + esc(s.id) + '">' +
-          '<span class="t-dot"></span>' +
-          '<div class="t-title">' + esc(s.prompt) + '</div>' +
-          '<div class="t-foot">' +
-          '<span class="t-proj">' + esc(proj) + '</span>' +
-          '<span class="t-cost">' + money(s.cost) + '</span>' +
-          '</div>' +
-          '</div>';
-      }).join('') +
-      '</div>';
+  function renderTiles(d, from, to) {
+    var body = d.slice(from, to).map(function (s) {
+      var cls = modelClass(s.model) === 'opus' ? ' op' : '';
+      if (s.empty) cls += ' is-empty';
+      var proj = (s.displayPath || '').split('/').pop() || s.displayPath || '';
+      return '<div class="tile' + cls + '" data-id="' + esc(s.id) + '" tabindex="0" role="button">' +
+        '<span class="t-dot"></span>' +
+        '<div class="t-title">' + promptLabel(s) + '</div>' +
+        '<div class="t-foot">' +
+        '<span class="t-proj">' + esc(proj) + '</span>' +
+        '<span class="t-cost"' + costTitleAttr(s) + '>' + money(s.cost) + '</span>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+    return from === 0 ? '<div class="view-tiles">' + body + '</div>' : body;
   }
 
   /* ------------------------------------------------------------------ */
@@ -206,6 +176,43 @@
   /* ------------------------------------------------------------------ */
   function skeletonHTML() {
     return '<div class="skeleton">' + Array(8).fill('<div class="sk"></div>').join('') + '</div>';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Click / keyboard wiring — shared across renderers and pagination     */
+  /* ------------------------------------------------------------------ */
+  function wireItems(scope) {
+    scope.querySelectorAll('[data-id]').forEach(function (el) {
+      if (el.dataset.wired === '1') return;
+      el.dataset.wired = '1';
+      var id = el.dataset.id;
+      function open() {
+        recordOpen(id);
+        CCE.router.go('#/viewer?id=' + encodeURIComponent(id));
+      }
+      el.addEventListener('click', function (e) {
+        if (e.target.closest('.star')) return; // handled below
+        open();
+      });
+      el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+      });
+    });
+    scope.querySelectorAll('.star').forEach(function (el) {
+      if (el.dataset.wired === '1') return;
+      el.dataset.wired = '1';
+      el.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var row = el.closest('[data-id]');
+        if (!row) return;
+        var id = row.dataset.id;
+        CCE.store.toggleFavorite(id);
+        var on = CCE.store.isFavorite(id);
+        el.classList.toggle('on', on);
+        var svgEl = el.querySelector('svg');
+        if (svgEl) svgEl.setAttribute('fill', on ? 'currentColor' : 'none');
+      });
+    });
   }
 
   /* ------------------------------------------------------------------ */
@@ -219,62 +226,38 @@
     eyebrowEl.textContent = state.group === 'By project' ? 'Grouped by project' : 'All sessions';
 
     if (d.length === 0) {
-      var msg = state.q
-        ? 'Nothing matches “' + state.q + '”'
-        : 'No sessions found';
-      var sub = state.q
-        ? 'Try a different search, or clear the filter.'
-        : 'Connect to a folder with Claude sessions.';
       stage.innerHTML =
         '<div class="empty">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">' +
         '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>' +
         '</svg>' +
-        '<h3>' + esc(msg) + '</h3>' +
-        '<p>' + esc(sub) + '</p>' +
-        (state.q ? '<button class="empty-action" id="empty-clear-search">Clear search</button>' : '') +
+        '<h3>No sessions found</h3>' +
+        '<p>Connect to a folder with Claude sessions.</p>' +
         '</div>';
-      var clearBtn = stage.querySelector('#empty-clear-search');
-      if (clearBtn) {
-        clearBtn.addEventListener('click', function () {
-          state.q = '';
-          var qInput = document.querySelector('#cce-q');
-          if (qInput) qInput.value = '';
-          renderStage(stage, totalEl, eyebrowEl, summaries);
-        });
-      }
       return;
     }
 
-    if (state.view === 'grid') {
-      stage.innerHTML = renderGrid(d);
-    } else if (state.view === 'tiles') {
-      stage.innerHTML = renderTiles(d);
-    } else {
-      stage.innerHTML = renderList(d);
+    var PAGE = 60;
+    var renderer = state.view === 'grid' ? renderGrid : state.view === 'tiles' ? renderTiles : renderList;
+    stage.innerHTML = renderer(d, 0, PAGE);
+    var container = stage.firstElementChild || stage;
+    var rendered = Math.min(PAGE, d.length);
+    if (rendered < d.length) {
+      var sentinel = document.createElement('div');
+      sentinel.className = 'cce-sentinel'; sentinel.setAttribute('aria-hidden', 'true');
+      stage.appendChild(sentinel);
+      var io = new IntersectionObserver(function (en) {
+        if (!en[0].isIntersecting) return;
+        var tmp = document.createElement('div');
+        tmp.innerHTML = renderer(d, rendered, rendered + PAGE);
+        while (tmp.firstChild) container.appendChild(tmp.firstChild);
+        rendered += PAGE;
+        wireItems(container);
+        if (rendered >= d.length) { io.disconnect(); sentinel.remove(); }
+      }, { root: document.getElementById('view-root'), rootMargin: '600px' });
+      io.observe(sentinel);
     }
-
-    /* Wire click events: session click → navigate; star click → toggle */
-    stage.querySelectorAll('[data-id]').forEach(function (el) {
-      var id = el.dataset.id;
-      el.addEventListener('click', function (e) {
-        if (e.target.closest('.star')) return; // handled below
-        CCE.router.go('#/viewer?id=' + encodeURIComponent(id));
-      });
-    });
-    stage.querySelectorAll('.star').forEach(function (el) {
-      el.addEventListener('click', function (e) {
-        e.stopPropagation();
-        var row = el.closest('[data-id]');
-        if (!row) return;
-        var id = row.dataset.id;
-        CCE.store.toggleFavorite(id);
-        var on = CCE.store.isFavorite(id);
-        el.classList.toggle('on', on);
-        var svgEl = el.querySelector('svg');
-        if (svgEl) svgEl.setAttribute('fill', on ? 'currentColor' : 'none');
-      });
-    });
+    wireItems(container);
   }
 
   /* ------------------------------------------------------------------ */
@@ -316,7 +299,13 @@
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
       '<path d="M3 7h18M3 12h18M3 17h18"/>' +
       '</svg><span id="cce-group-label">Recent</span>' +
-      '</button>';
+      '</button>' +
+
+      '<select class="tbtn" id="cce-f-project" aria-label="Filter by project"><option value="">All projects</option></select>' +
+      '<select class="tbtn" id="cce-f-model" aria-label="Filter by model"><option value="">Any model</option><option value="opus">Opus</option><option value="sonnet">Sonnet</option><option value="haiku">Haiku</option><option value="fable">Fable</option></select>' +
+      '<select class="tbtn" id="cce-f-branch" aria-label="Filter by branch"><option value="">Any branch</option></select>' +
+      '<select class="tbtn" id="cce-f-days" aria-label="Filter by date"><option value="0">All time</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select>' +
+      '<button class="tbtn" id="cce-f-starred" aria-pressed="false">★ Starred</button>';
   }
 
   /* ------------------------------------------------------------------ */
@@ -357,6 +346,7 @@
       state.sort  = 'Recent';
       state.group = CCE.store.get('group', 'By project');
       state.q     = '';
+      state.filters = { project: '', model: '', branch: '', days: 0, starred: false };
 
       /* Update seg toggle buttons */
       ctxEl.querySelectorAll('#cce-seg button').forEach(function (b) {
@@ -382,10 +372,10 @@
         if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
       });
 
-      /* Sort cycle: Recent → Cost → Messages → Recent */
+      /* Sort cycle: Recent → Cost → Messages → Project → Recent */
       var sortBtn = ctxEl.querySelector('#cce-sort-btn');
       if (sortBtn) sortBtn.addEventListener('click', function () {
-        state.sort = state.sort === 'Recent' ? 'Cost' : state.sort === 'Cost' ? 'Messages' : 'Recent';
+        state.sort = state.sort === 'Recent' ? 'Cost' : state.sort === 'Cost' ? 'Messages' : state.sort === 'Messages' ? 'Project' : 'Recent';
         var lbl = ctxEl.querySelector('#cce-sort-label');
         if (lbl) lbl.textContent = state.sort;
         if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
@@ -401,6 +391,29 @@
         if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
       });
 
+      /* Filter controls: project / model / branch / date / starred */
+      function populateFilterOptions(summaries) {
+        var projects = {}, branches = {};
+        summaries.forEach(function (s) { projects[s.projectFolder] = s.displayPath; if (s.branch) branches[s.branch] = 1; });
+        var pSel = ctxEl.querySelector('#cce-f-project'), bSel = ctxEl.querySelector('#cce-f-branch');
+        if (pSel) Object.keys(projects).sort().forEach(function (k) { var o = document.createElement('option'); o.value = k; o.textContent = projects[k]; pSel.appendChild(o); });
+        if (bSel) Object.keys(branches).sort().forEach(function (b) { var o = document.createElement('option'); o.value = b; o.textContent = b; bSel.appendChild(o); });
+      }
+      ['project', 'model', 'branch', 'days'].forEach(function (name) {
+        var el = ctxEl.querySelector('#cce-f-' + name);
+        if (el) el.addEventListener('change', function () {
+          state.filters[name] = name === 'days' ? Number(el.value) : el.value;
+          if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
+        });
+      });
+      var starBtn = ctxEl.querySelector('#cce-f-starred');
+      if (starBtn) starBtn.addEventListener('click', function () {
+        state.filters.starred = !state.filters.starred;
+        starBtn.setAttribute('aria-pressed', String(state.filters.starred));
+        starBtn.classList.toggle('on', state.filters.starred);
+        if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
+      });
+
       /* -------------------------------------------------------------- */
       /* 4. Show skeleton while loading                                   */
       /* -------------------------------------------------------------- */
@@ -408,6 +421,7 @@
         /* Already loaded — re-render immediately (user navigated back) */
         renderStage(stage, totalEl, eyebrowEl, cachedSessions());
         renderRecentStrip(root.querySelector('#cce-recent'), cachedSessions());
+        populateFilterOptions(cachedSessions());
         return;
       }
 
@@ -424,6 +438,7 @@
       }).then(function (results) {
         renderStage(stage, totalEl, eyebrowEl, results);
         renderRecentStrip(root.querySelector('#cce-recent'), results);
+        populateFilterOptions(results);
       }).catch(function (err) {
         console.error('[CCE browse] load failed:', err);
         stage.innerHTML =
@@ -439,29 +454,26 @@
   });
 
   /* ------------------------------------------------------------------ */
-  /* Recently-viewed strip (last 5 recent sessions)                      */
+  /* Recently-opened strip (last 4 sessions actually opened)              */
   /* ------------------------------------------------------------------ */
-  function renderRecentStrip(container, summaries) {
-    if (!container || !summaries || summaries.length === 0) return;
-    var rec = summaries.slice(0, 5);
-    container.innerHTML =
-      '<span class="rlabel">Recently viewed</span>' +
-      rec.map(function (s) {
-        var isOpus = modelClass(s.model) === 'opus';
-        var colorVar = isOpus ? 'var(--c-assistant)' : 'var(--c-user)';
-        var label = (s.prompt || '').slice(0, 26);
-        if (s.prompt && s.prompt.length > 26) label += '…';
-        return '<div class="rpill" data-id="' + esc(s.id) + '" style="cursor:pointer">' +
-          '<span class="rdot" style="width:6px;height:6px;border-radius:50%;background:' + colorVar + '"></span>' +
-          esc(label) +
-          '</div>';
-      }).join('');
+  function recordOpen(id) {
+    var list = (CCE.store.get('recentOpened', []) || []).filter(function (x) { return x !== id; });
+    list.unshift(id);
+    CCE.store.set('recentOpened', list.slice(0, 8));
+  }
 
-    container.querySelectorAll('.rpill[data-id]').forEach(function (el) {
-      el.addEventListener('click', function () {
-        CCE.router.go('#/viewer?id=' + encodeURIComponent(el.dataset.id));
-      });
-    });
+  function renderRecentStrip(container, summaries) {
+    if (!container || !summaries) return;
+    var byId = {}; summaries.forEach(function (s) { byId[s.id] = s; });
+    var rec = (CCE.store.get('recentOpened', []) || []).map(function (id) { return byId[id]; }).filter(Boolean).slice(0, 4);
+    if (!rec.length) { container.innerHTML = ''; return; }
+    container.innerHTML = '<span class="rlabel">Recently opened</span>' + rec.map(function (s) {
+      var colorVar = modelClass(s.model) === 'opus' ? 'var(--c-assistant)' : 'var(--c-user)';
+      var label = (s.prompt || '').slice(0, 26) + ((s.prompt || '').length > 26 ? '…' : '');
+      return '<div class="rpill" role="button" tabindex="0" data-id="' + esc(s.id) + '" title="' + esc(s.prompt || '') + '">' +
+        '<span class="rdot" style="width:6px;height:6px;border-radius:50%;background:' + colorVar + '"></span>' + esc(label) + '</div>';
+    }).join('');
+    wireItems(container);
   }
 
 })(typeof globalThis !== 'undefined' ? globalThis : this);

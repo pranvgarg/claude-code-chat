@@ -114,3 +114,10 @@
 .rpill { display:flex; align-items:center; gap:7px; background:var(--surface); border:1px solid var(--border-soft); border-radius:20px; padding:5px 12px 5px 10px; font-size:var(--fs-sm); color:var(--text-dim); cursor:pointer; transition: color var(--motion-fast), border-color var(--motion-fast); }
 .rpill:hover { color:var(--text); border-color:var(--border); }
 .rpill .rdot { width:6px;height:6px;border-radius:50%; }
+
+/* ---- filters row, keyboard focus, windowed-render sentinel ---- */
+[data-id][tabindex="0"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card.is-empty .prompt, .lrow.is-empty .l-prompt, .tile.is-empty .t-title { color: var(--text-faint); font-style: italic; }
+select.tbtn { appearance: none; -webkit-appearance: none; padding-right: 22px; }
+.tbtn.on { color: var(--c-cost); border-color: color-mix(in srgb, var(--c-cost) 40%, transparent); background: color-mix(in srgb, var(--c-cost) 12%, transparent); }
+.cce-sentinel { height: 1px; }
