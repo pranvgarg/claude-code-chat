@@ -2,12 +2,23 @@
   'use strict';
   const CCE = g.CCE = g.CCE || {};
   const CONCURRENCY = 4;
+  // Reuse the shared cached-record shape version from session-store.js (falls
+  // back to 1 if session-store.js hasn't loaded — e.g. createSearchStore()
+  // used standalone in tests).
+  const CACHE_VERSION = (CCE.sessionStore && CCE.sessionStore.CACHE_VERSION) || 1;
 
   function workerBuilder() {
     var worker = null, pending = {}, seq = 0;
     function ensureWorker() {
       if (worker || typeof g.Worker !== 'function') return worker;
-      worker = new g.Worker('assets/js/workers/index-worker.js');
+      try {
+        worker = new g.Worker('assets/js/workers/index-worker.js');
+      } catch (e) {
+        // Worker construction can throw (e.g. SecurityError on file://).
+        // Fall back to the main-thread indexer (CCE.searchIndex.build) below.
+        worker = null;
+        return null;
+      }
       worker.onmessage = function (e) {
         var m = e.data || {}, p = pending[m.id];
         if (!p) return;
@@ -39,9 +50,11 @@
   }
 
   function createSearchStore(deps) {
-    var indexes = new Map(), building = null;
+    var indexes = new Map(), building = null, built = false;
 
-    function ensureBuilt(onProgress) {
+    function ensureBuilt(onProgress, opts) {
+      opts = opts || {};
+      if (built && !opts.force) return Promise.resolve();
       if (building) return building;
       building = Promise.resolve(deps.descriptors()).then(function (descs) {
         descs = descs || [];
@@ -50,10 +63,10 @@
           var key = desc.projectFolder + '/' + desc.id;
           return desc.stat().then(function (st) {
             return deps.cache.get(key).then(function (hit) {
-              if (hit && hit.size === st.size && hit.lastModified === st.lastModified) { indexes.set(key, hit.index); return; }
+              if (hit && hit.v === CACHE_VERSION && hit.size === st.size && hit.lastModified === st.lastModified) { indexes.set(key, hit.index); return; }
               return desc.read().then(function (text) { return deps.buildIndex(key, text); }).then(function (index) {
                 indexes.set(key, index);
-                return deps.cache.set(key, { size: st.size, lastModified: st.lastModified, index: index });
+                return deps.cache.set(key, { v: CACHE_VERSION, size: st.size, lastModified: st.lastModified, index: index });
               });
             });
           }).catch(function (err) { console.warn('[CCE search] index failed for', key, err); })
@@ -66,7 +79,7 @@
           return Promise.all(batch.map(one)).then(next);
         }
         return next();
-      }).finally(function () { building = null; });
+      }).then(function () { built = true; }).finally(function () { building = null; });
       return building;
     }
 

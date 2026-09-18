@@ -2,6 +2,11 @@
   'use strict';
   const CCE = g.CCE = g.CCE || {};
   const DB_NAME = 'cce-cache', DB_VERSION = 1, BATCH = 8;
+  // Shape version for cached record VALUES (summaries / search index blobs),
+  // independent of DB_VERSION (the IndexedDB schema version). Bump this when
+  // the shape of a cached record changes so stale-shaped records are treated
+  // as a miss instead of being handed back to code that expects the new shape.
+  const CACHE_VERSION = 1;
 
   function openCacheDB() {
     return new Promise(function (resolve, reject) {
@@ -55,6 +60,7 @@
 
     function load(opts) {
       opts = opts || {};
+      if (_all && !opts.force) return Promise.resolve(_all);
       if (_loading) return _loading;
       _loading = deps.listSessions().then(function (descs) {
         _descs = descs;
@@ -63,13 +69,13 @@
           var key = desc.projectFolder + '/' + desc.id;
           return desc.stat().then(function (st) {
             return deps.cache.get(key).then(function (hit) {
-              if (hit && hit.size === st.size && hit.lastModified === st.lastModified) { cached++; return hit.summary; }
+              if (hit && hit.v === CACHE_VERSION && hit.size === st.size && hit.lastModified === st.lastModified) { cached++; return hit.summary; }
               return desc.read().then(function (text) {
                 if (opts.onText) { try { opts.onText(desc, text); } catch (e) {} }
                 var summary = deps.summarize(deps.parse(text), { id: desc.id, projectFolder: desc.projectFolder });
                 summary.displayPath = deps.projectDisplayPath(desc.projectFolder);
                 summary.relPath = desc.relPath;
-                return deps.cache.set(key, { size: st.size, lastModified: st.lastModified, summary: summary }).then(function () { return summary; });
+                return deps.cache.set(key, { v: CACHE_VERSION, size: st.size, lastModified: st.lastModified, summary: summary }).then(function () { return summary; });
               });
             });
           }).catch(function () { return null; });
@@ -118,6 +124,7 @@
 
   CCE.sessionStore = {
     load: live.load, all: live.all, descriptors: live.descriptors, invalidate: live.invalidate,
-    createStore: createStore, openCacheDB: openCacheDB, idbCache: idbCache
+    createStore: createStore, openCacheDB: openCacheDB, idbCache: idbCache,
+    CACHE_VERSION: CACHE_VERSION
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
