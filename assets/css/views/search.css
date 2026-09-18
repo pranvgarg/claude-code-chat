@@ -1,0 +1,23 @@
+/* Search results view (srch-*) */
+.srch-head { display:flex; align-items:baseline; gap:12px; margin-bottom:18px; }
+.srch-count { font-size: var(--fs-md); color: var(--text-dim); }
+.srch-count strong { color: var(--text); font-size: var(--fs-xl); font-weight:700; letter-spacing:-0.015em; }
+.srch-index-status { font-size: var(--fs-xs); color: var(--text-faint); font-family: var(--font-mono); }
+.srch-group { border:1px solid var(--border); border-radius: var(--r-md); background: var(--surface); margin-bottom:14px; overflow:hidden; }
+.srch-group-head { display:flex; align-items:center; gap:12px; height:44px; padding:0 16px; border-bottom:1px solid var(--border-soft); cursor:pointer; }
+.srch-group-head:hover { background: var(--elevated); }
+.srch-title { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; color: var(--text); }
+.srch-meta { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); }
+.srch-hits { font-family: var(--font-mono); font-size: var(--fs-xs); font-weight:700; color: var(--text-dim); padding:2px 8px; border-radius:100px; background: var(--elevated); }
+.srch-row { display:flex; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border-soft); color:inherit; text-decoration:none; }
+.srch-row:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.srch-row:last-of-type { border-bottom:none; }
+.srch-rail { width:3px; flex-shrink:0; border-radius:2px; }
+.srch-row-body { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.srch-role { font-size: var(--fs-xs); font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+.srch-snippet { font-size: var(--fs-md); line-height: var(--lh-base); color: var(--text-dim); word-break: break-word; }
+.srch-snippet mark { background: color-mix(in srgb, var(--c-cost) 28%, transparent); color: var(--text); font-weight:600; border-radius:3px; padding:0 2px; }
+.srch-more, .srch-loading { display:block; text-align:center; padding:9px; font-size: var(--fs-sm); color: var(--accent); text-decoration:none; border-top:1px solid var(--border-soft); }
+.srch-loading { color: var(--text-faint); }
+.search-kbd { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); border:1px solid var(--border); border-radius: var(--r-xs); padding:1px 6px; }
+.toolbar-actions { display:flex; align-items:center; gap:12px; flex:1; min-width:0; }

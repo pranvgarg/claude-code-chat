@@ -407,7 +407,7 @@
   /* Clear toolbar when mounting (no controls needed for dashboard)      */
   /* ------------------------------------------------------------------ */
   function clearToolbar() {
-    var shellToolbar = document.querySelector('.toolbar');
+    var shellToolbar = document.getElementById('toolbar-actions');
     if (shellToolbar) {
       shellToolbar.innerHTML =
         '<span style="font-size:12px;color:var(--text-dim);font-family:var(--font-mono)">Usage &amp; Cost</span>';

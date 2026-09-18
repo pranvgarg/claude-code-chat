@@ -8,11 +8,16 @@
       render();
     }
   };
+  let current = null;
   function render() {
     const hash = (location.hash || '#/sessions').split('?')[0]; // strip query (e.g. #/viewer?id=x)
     const view = views[hash] || views['#/sessions'];
     const main = document.getElementById('view-root');
     if (!view || !CCE.state.connected) return;
+    if (current && typeof current.unmount === 'function') {
+      try { current.unmount(); } catch (e) { console.error(e); }
+    }
+    current = view;
     document.querySelectorAll('.nav-item[data-hash]').forEach(n => {
       const isActive = n.dataset.hash === hash;
       n.classList.toggle('active', isActive);
@@ -25,6 +30,8 @@
     if (CCE.app && typeof CCE.app.clearActiveProject === 'function') {
       CCE.app.clearActiveProject();
     }
+    const actions = document.getElementById('toolbar-actions');
+    if (actions) actions.innerHTML = '';
     main.innerHTML = '';
     view.mount(main);
     // Fade the freshly mounted view in (CSS handles the reduced-motion guard).
@@ -78,6 +85,13 @@
   };
   CCE.app.clearActiveProject = function () { CCE.app.setActiveProject(null); };
 
+  // Keep the global toolbar search box in sync with the current #/search
+  // query (e.g. on load, back/forward nav, or when the search view mounts).
+  CCE.app.syncSearchBox = function (term) {
+    var q = document.getElementById('global-q');
+    if (q && q.value !== term) q.value = term;
+  };
+
   // All sidebar tabs now have real views (registered by their own view files
   // which load after app.js). No placeholder routes remain.
 
@@ -90,6 +104,20 @@
         savedTheme = localStorage.getItem('cce-theme') || 'dark';
       }
       document.documentElement.dataset.theme = savedTheme;
+
+      var q = document.getElementById('global-q');
+      if (q) {
+        var go = CCE.util.debounce(function () {
+          var term = q.value.trim();
+          var onSearch = location.hash.indexOf('#/search') === 0;
+          if (!term) { if (onSearch) CCE.router.go('#/sessions'); return; }
+          var scope = new URLSearchParams(location.hash.split('?')[1] || '').get('scope') || 'full';
+          var target = '#/search?q=' + encodeURIComponent(term) + '&scope=' + scope;
+          if (onSearch) { history.replaceState(null, '', target); render(); } else location.hash = target;
+        }, 250);
+        q.addEventListener('input', go);
+        q.addEventListener('keydown', function (e) { if (e.key === 'Escape') { q.value = ''; go(); } });
+      }
 
       window.addEventListener('hashchange', render);
 

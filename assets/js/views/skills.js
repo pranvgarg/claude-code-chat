@@ -63,7 +63,7 @@
     title: 'Skills',
     mount: function (root) {
       /* 1. Set shell toolbar title */
-      var tb = document.querySelector('.toolbar');
+      var tb = document.getElementById('toolbar-actions');
       if (tb) tb.innerHTML = '<span class="doc-title">Skills</span><div class="spacer"></div>';
 
       /* 2. Build layout */

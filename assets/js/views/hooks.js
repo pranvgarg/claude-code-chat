@@ -9,7 +9,7 @@
     title: 'Hooks',
     mount: function (root) {
       /* 1. Set shell toolbar title */
-      var tb = document.querySelector('.toolbar');
+      var tb = document.getElementById('toolbar-actions');
       if (tb) {
         tb.innerHTML = '<span class="doc-title">Hooks</span><div class="spacer"></div>';
       }

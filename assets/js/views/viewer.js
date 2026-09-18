@@ -653,7 +653,7 @@
       }
 
       /* ---- 2. Populate toolbar ---- */
-      var shellToolbar = document.querySelector('.toolbar');
+      var shellToolbar = document.getElementById('toolbar-actions');
       if (shellToolbar) {
         shellToolbar.innerHTML =
           '<button class="vwr-btn" id="vwr-back">&#8592; Sessions</button>' +

@@ -281,14 +281,7 @@
   /* Toolbar HTML                                                         */
   /* ------------------------------------------------------------------ */
   function toolbarHTML() {
-    return '<div class="search" id="cce-search">' +
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-      '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>' +
-      '</svg>' +
-      '<input id="cce-q" type="text" placeholder="Search all sessions…">' +
-      '</div>' +
-
-      '<div class="seg" id="cce-seg">' +
+    return '<div class="seg" id="cce-seg">' +
       '<button data-view="grid" title="Grid — rich cards">' +
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
       '<rect x="3" y="3" width="7" height="7" rx="1"/>' +
@@ -335,7 +328,7 @@
       /* -------------------------------------------------------------- */
       /* 1. Populate the shell toolbar (sibling of view-root)            */
       /* -------------------------------------------------------------- */
-      var shellToolbar = document.querySelector('.toolbar');
+      var shellToolbar = document.getElementById('toolbar-actions');
       if (shellToolbar) {
         shellToolbar.innerHTML = toolbarHTML();
       }
@@ -377,13 +370,6 @@
       /* -------------------------------------------------------------- */
       /* 3. Wire controls                                                 */
       /* -------------------------------------------------------------- */
-      /* Search */
-      var qInput = ctxEl.querySelector('#cce-q');
-      if (qInput) qInput.addEventListener('input', function (e) {
-        state.q = e.target.value;
-        if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
-      });
-
       /* View toggle */
       var segEl = ctxEl.querySelector('#cce-seg');
       if (segEl) segEl.addEventListener('click', function (e) {

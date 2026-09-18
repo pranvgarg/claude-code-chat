@@ -9,7 +9,7 @@
     title: 'Plans',
     mount: function (root) {
       /* Set toolbar */
-      var tb = document.querySelector('.toolbar');
+      var tb = document.getElementById('toolbar-actions');
       if (tb) tb.innerHTML = '<span class="doc-title">Plans</span><div class="spacer"></div>';
 
       /* Set base layout */

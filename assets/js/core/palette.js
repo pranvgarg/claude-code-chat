@@ -13,7 +13,7 @@
   function buildSyncIndex() {
     var index = [];
 
-    var sessions = (CCE.sessions && CCE.sessions.all && CCE.sessions.all()) || [];
+    var sessions = (CCE.sessionStore && CCE.sessionStore.all()) || [];
     sessions.forEach(function (s) {
       index.push({
         type: 'session',
@@ -154,18 +154,20 @@
     CCE.router.go(item.hash);
   }
 
+  var fuse = null, fuseSource = null;
   function filter(query) {
     var index = cachedIndex;
     if (!query) { render(index.slice(0, 40)); return; }
+    var extra = [{ type: 'search', label: 'Search transcripts for “' + query + '”', sublabel: 'Full-text search', hash: '#/search?q=' + encodeURIComponent(query) + '&scope=full' }];
     if (typeof Fuse !== 'undefined') {
-      var fuse = new Fuse(index, { keys: ['label', 'sublabel'], threshold: 0.4 });
-      render(fuse.search(query).slice(0, 40).map(function (r) { return r.item; }));
+      if (fuseSource !== index) { fuse = new Fuse(index, { keys: ['label', 'sublabel'], threshold: 0.4 }); fuseSource = index; }
+      render(extra.concat(fuse.search(query).slice(0, 39).map(function (r) { return r.item; })));
       return;
     }
     var q = query.toLowerCase();
-    render(index.filter(function (item) {
+    render(extra.concat(index.filter(function (item) {
       return (item.label + ' ' + item.sublabel).toLowerCase().indexOf(q) !== -1;
-    }).slice(0, 40));
+    }).slice(0, 39)));
   }
 
   function open() {

@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="assets/css/views/viewer.css">
   <link rel="stylesheet" href="assets/css/views/dashboard.css">
   <link rel="stylesheet" href="assets/css/views/docs.css">
+  <link rel="stylesheet" href="assets/css/views/search.css">
   <link rel="stylesheet" href="assets/css/views/palette.css">
   <link rel="stylesheet" href="assets/vendor/prism.css">
 </head>
@@ -168,11 +169,12 @@
   <!-- Main pane -->
   <main class="main">
     <div class="toolbar">
-      <div class="search">
+      <div class="search" id="global-search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input type="text" placeholder="Search…">
+        <input type="search" id="global-q" placeholder="Search sessions and transcripts…" aria-label="Search sessions and transcripts" autocomplete="off">
+        <kbd class="search-kbd" title="Command palette">⌘K</kbd>
       </div>
-      <div class="spacer"></div>
+      <div class="toolbar-actions" id="toolbar-actions"></div>
     </div>
     <div id="view-root" class="content">
       <!-- Views mount here -->
@@ -210,6 +212,7 @@
 <script src="assets/js/views/commands.js"></script>
 <script src="assets/js/views/hooks.js"></script>
 <script src="assets/js/views/memory.js"></script>
+<script src="assets/js/views/search.js"></script>
 
 </body>
 </html>
