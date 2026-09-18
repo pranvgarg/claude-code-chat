@@ -296,6 +296,13 @@
     '</div>';
   }
 
+  function dateHintFor(days) {
+    if (days === 7) return 'Last 7 days';
+    if (days === 30) return 'Last 30 days';
+    if (days === 90) return 'Last 90 days';
+    return 'All sessions';
+  }
+
   function renderDashboard(root, summaries) {
     var data = compute(summaries);
 
@@ -305,7 +312,7 @@
         /* Page header */
         '<div class="dash-page-header">' +
           '<div class="dash-page-title">Usage &amp; Cost</div>' +
-          '<div class="dash-date-hint">All sessions</div>' +
+          '<div class="dash-date-hint">' + esc(dateHintFor(state.days)) + '</div>' +
         '</div>' +
 
         /* Stat cards */
