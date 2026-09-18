@@ -19,5 +19,3 @@
 .srch-snippet mark { background: color-mix(in srgb, var(--c-cost) 28%, transparent); color: var(--text); font-weight:600; border-radius:3px; padding:0 2px; }
 .srch-more, .srch-loading { display:block; text-align:center; padding:9px; font-size: var(--fs-sm); color: var(--accent); text-decoration:none; border-top:1px solid var(--border-soft); }
 .srch-loading { color: var(--text-faint); }
-.search-kbd { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); border:1px solid var(--border); border-radius: var(--r-xs); padding:1px 6px; }
-.toolbar-actions { display:flex; align-items:center; gap:12px; flex:1; min-width:0; }
