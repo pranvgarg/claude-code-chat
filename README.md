@@ -10,7 +10,9 @@ A local, offline explorer for your `~/.claude` folder — browse sessions, usage
 npx harness-explorer
 ```
 
-This starts a local static file server on an available port and opens your browser automatically. Use `cce stop` to stop it and `cce status` to check whether it's running (both installed alongside the `cce` binary).
+This starts a local static file server and opens your browser automatically. The server prefers a fixed port (`61489`) and falls back sequentially (`61490`, `61491`, …) only if that port is taken — the browser's folder permission (granted via the File System Access API) is tied to the origin (scheme + host + port), so keeping the port stable across restarts means you don't get re-prompted to pick `~/.claude` again. Use `cce stop` to stop it, `cce status` to check whether it's running, `cce --help` for usage, and `cce --version` for the installed version (all installed alongside the `cce` binary).
+
+Full-text search (the global search box) needs the app to be served over `http://localhost` — Web Workers, which build the search index off the main thread, are unavailable on `file://`. Opening `index.html` directly still works; the app detects the missing Worker and falls back to building the index on the main thread, which is slower for large session histories.
 
 **Option B — open the file directly:**
 
@@ -55,9 +57,20 @@ Three views for browsing sessions — switch with the List / Grid / Tiles toggle
 | **Tiles** | Dense tile layout for high-volume browsing |
 
 - **Star sessions** — Click the star to favorite a session; favorites persist across browser restarts
-- **Search** — Full-text filter across session summaries and project paths
-- **Sort** — By date, cost, or turn count
-- **Project filter** — Narrow to a single project folder
+- **Filters** — Project, model, git branch, date range (7/30/90 days or all time), and starred-only, combinable
+- **Sort** — By date (recent), cost, turn count, or project (alphabetical, then recent within each project)
+- **Recently opened** — A strip of your last few opened sessions for quick return
+- **Global search** — See "Search" below for the full-text search box in the toolbar
+- **What's remembered** — View mode (List/Grid/Tiles) and grouping (By project) are saved and restored on your next visit; filters (project, model, branch, date range, starred) reset to "all" each time you open Sessions
+
+### Search
+
+The search box in the toolbar searches across your whole `~/.claude` folder, not just the current view:
+
+- **What it searches** — Session titles, full transcripts (user messages, assistant responses, thinking blocks), and tool calls
+- **Scope toggle** — Narrow to Titles, Full text, or Tool calls only
+- **Results grouped by session** — Each matching session shows its top snippets inline; click a snippet to jump straight to that exact turn in the viewer, or "Show N more" to see every match in that session
+- **Indexing** — The index is built in a Web Worker (off the main thread) and cached in IndexedDB, keyed by file size + modified time, so unchanged sessions are never re-indexed on subsequent visits
 
 ### Session Viewer
 
@@ -73,7 +86,7 @@ Click any session to open it as a rendered conversation:
 - **DOMPurify sanitization** — All HTML content sanitized before render (vendored)
 - **Scroll-to-bottom FAB** — Appears after scrolling up >200px; smooth-scrolls back to the latest turn
 - **Scroll-progress bar** — A 2px gradient bar at the top of the viewer tracks reading position
-- **Resume state** — Filters, search, and TOC selections persist when you navigate away and come back
+- **View mode persists, filters reset per session** — Role filters (User/Assistant/System/Progress/Snapshots) and the TOC sidebar's open/closed state carry over as you move between sessions in the viewer; the search box itself resets to empty each time you open a session
 
 ### Usage Dashboard
 
@@ -88,6 +101,14 @@ The **Usage** tab shows aggregated statistics across all sessions in the picked 
 - **Token usage over time**
 - **Model breakdown** (if multiple models used)
 - **Session count and average cost**
+
+### Hooks
+
+The **Hooks** tab shows the hooks configured across your `settings.json` files:
+
+- **Per-event sidebar** — Hooks grouped by lifecycle event (PreToolUse, PostToolUse, Notification, etc.); pick an event to see the matchers and commands registered for it
+- **Inline script preview** — Hook commands that point at a local script under `~/.claude/hooks` show the script's contents inline, so you don't have to open a terminal to see what a hook actually runs
+- **User-level hooks only** — Reads your global `~/.claude/settings.json`; a note flags that a repository's own project-level `.claude/settings.json` hooks aren't shown here
 
 ## Persistence
 
