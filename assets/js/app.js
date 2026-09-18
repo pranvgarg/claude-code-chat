@@ -40,7 +40,7 @@
   // Reads CCE.sessions.all() exposed by browse.js — safe to call anytime.
   CCE.app = CCE.app || {};
   CCE.app.updateNavCounts = function () {
-    var sessions = (CCE.sessions && CCE.sessions.all && CCE.sessions.all()) || null;
+    var sessions = (CCE.sessionStore && CCE.sessionStore.all()) || null;
     var badge = document.querySelector('.nav-item[data-hash="#/sessions"] .count');
     if (badge && sessions) badge.textContent = String(sessions.length);
   };

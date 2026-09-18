@@ -423,56 +423,15 @@
       clearToolbar();
       renderLoading(root);
 
-      /* Try to use cached data from browse.js */
-      var data = (CCE.sessions && CCE.sessions.all && CCE.sessions.all()) || null;
+      var data = CCE.sessionStore.all();
       if (data) {
-        if (data.length === 0) {
-          renderEmpty(root);
-        } else {
-          renderDashboard(root, data);
-        }
+        if (data.length === 0) renderEmpty(root); else renderDashboard(root, data);
         return;
       }
-
-      /* Cache miss: load sessions ourselves */
-      CCE.fsaccess.listSessions().then(function (descriptors) {
-        var BATCH = 8;
-        var results = [];
-        var i = 0;
-
-        function nextBatch() {
-          var batch = descriptors.slice(i, i + BATCH);
-          if (batch.length === 0) return Promise.resolve();
-          i += BATCH;
-          return Promise.all(
-            batch.map(function (desc) {
-              return desc.read()
-                .then(function (text) {
-                  var entries = CCE.jsonl.parse(text);
-                  var summary = CCE.sessionIndex.summarize(entries, {
-                    id: desc.id,
-                    projectFolder: desc.projectFolder
-                  });
-                  summary.displayPath = CCE.sessionIndex.projectDisplayPath(desc.projectFolder);
-                  return summary;
-                })
-                .catch(function () { return null; });
-            })
-          ).then(function (batchResults) {
-            batchResults.forEach(function (s) { if (s) results.push(s); });
-            return nextBatch();
-          });
-        }
-
-        return nextBatch().then(function () {
-          if (results.length === 0) {
-            renderEmpty(root);
-          } else {
-            renderDashboard(root, results);
-          }
-        });
+      CCE.sessionStore.load().then(function (results) {
+        if (results.length === 0) renderEmpty(root); else renderDashboard(root, results);
       }).catch(function (err) {
-        console.error('[CCE dashboard] listSessions failed:', err);
+        console.error('[CCE dashboard] load failed:', err);
         renderError(root, err && err.message ? err.message : String(err));
       });
     }

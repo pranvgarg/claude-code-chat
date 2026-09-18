@@ -3,10 +3,10 @@
   var CCE = g.CCE = g.CCE || {};
 
   /* ------------------------------------------------------------------ */
-  /* Module-level cache + public accessor for Task 9 (dashboard)         */
+  /* Shared session store (Task 8) — replaces the old module-level cache */
   /* ------------------------------------------------------------------ */
-  var _cached = null; // Array of session summaries once loaded
-  CCE.sessions = { all: function () { return _cached; } };
+  CCE.sessions = { all: function () { return CCE.sessionStore.all(); } }; // compatibility alias
+  function cachedSessions() { return CCE.sessionStore.all(); }
 
   /* ------------------------------------------------------------------ */
   /* Helpers                                                              */
@@ -381,7 +381,7 @@
       var qInput = ctxEl.querySelector('#cce-q');
       if (qInput) qInput.addEventListener('input', function (e) {
         state.q = e.target.value;
-        if (_cached) renderStage(stage, totalEl, eyebrowEl, _cached);
+        if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
       });
 
       /* View toggle */
@@ -393,7 +393,7 @@
         btn.classList.add('on');
         state.view = btn.dataset.view;
         CCE.store.set('view', state.view);
-        if (_cached) renderStage(stage, totalEl, eyebrowEl, _cached);
+        if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
       });
 
       /* Sort cycle: Recent → Cost → Messages → Recent */
@@ -402,7 +402,7 @@
         state.sort = state.sort === 'Recent' ? 'Cost' : state.sort === 'Cost' ? 'Messages' : 'Recent';
         var lbl = ctxEl.querySelector('#cce-sort-label');
         if (lbl) lbl.textContent = state.sort;
-        if (_cached) renderStage(stage, totalEl, eyebrowEl, _cached);
+        if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
       });
 
       /* Group toggle: Recent ↔ By project */
@@ -412,16 +412,16 @@
         var lbl = ctxEl.querySelector('#cce-group-label');
         if (lbl) lbl.textContent = state.group;
         CCE.store.set('group', state.group);
-        if (_cached) renderStage(stage, totalEl, eyebrowEl, _cached);
+        if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
       });
 
       /* -------------------------------------------------------------- */
       /* 4. Show skeleton while loading                                   */
       /* -------------------------------------------------------------- */
-      if (_cached) {
+      if (cachedSessions()) {
         /* Already loaded — re-render immediately (user navigated back) */
-        renderStage(stage, totalEl, eyebrowEl, _cached);
-        renderRecentStrip(root.querySelector('#cce-recent'), _cached);
+        renderStage(stage, totalEl, eyebrowEl, cachedSessions());
+        renderRecentStrip(root.querySelector('#cce-recent'), cachedSessions());
         return;
       }
 
@@ -430,53 +430,16 @@
       /* -------------------------------------------------------------- */
       /* 5. Load and parse sessions                                       */
       /* -------------------------------------------------------------- */
-      CCE.fsaccess.listSessions().then(function (descriptors) {
-        /* Parse in batches to avoid blocking the main thread */
-        var BATCH = 8;
-        var results = [];
-        var i = 0;
-
-        function nextBatch() {
-          var batch = descriptors.slice(i, i + BATCH);
-          if (batch.length === 0) { return Promise.resolve(); }
-          i += BATCH;
-          return Promise.all(
-            batch.map(function (desc) {
-              return desc.read()
-                .then(function (text) {
-                  var entries = CCE.jsonl.parse(text);
-                  var summary = CCE.sessionIndex.summarize(entries, {
-                    id: desc.id,
-                    projectFolder: desc.projectFolder
-                  });
-                  summary.displayPath = CCE.sessionIndex.projectDisplayPath(desc.projectFolder);
-                  return summary;
-                })
-                .catch(function () { return null; }); // skip unreadable files
-            })
-          ).then(function (batch_results) {
-            batch_results.forEach(function (s) { if (s) results.push(s); });
-            return nextBatch();
-          });
+      CCE.sessionStore.load({
+        onProgress: function (p) {
+          var skEl = stage.querySelector('.skeleton');
+          if (skEl) skEl.setAttribute('aria-label', 'Loading ' + p.done + ' of ' + p.total + ' sessions');
         }
-
-        return nextBatch().then(function () {
-          /* Sort by lastTs descending (recent-first default) */
-          results.sort(function (a, b) {
-            var ta = a.lastTs ? new Date(a.lastTs).getTime() : 0;
-            var tb = b.lastTs ? new Date(b.lastTs).getTime() : 0;
-            return tb - ta;
-          });
-          _cached = results;
-          renderStage(stage, totalEl, eyebrowEl, _cached);
-          renderRecentStrip(root.querySelector('#cce-recent'), _cached);
-          // Notify other modules (sidebar nav badges) that sessions are loaded.
-          if (typeof g.dispatchEvent === 'function') {
-            g.dispatchEvent(new CustomEvent('cce:sessions-loaded', { detail: { count: results.length } }));
-          }
-        });
+      }).then(function (results) {
+        renderStage(stage, totalEl, eyebrowEl, results);
+        renderRecentStrip(root.querySelector('#cce-recent'), results);
       }).catch(function (err) {
-        console.error('[CCE browse] listSessions failed:', err);
+        console.error('[CCE browse] load failed:', err);
         stage.innerHTML =
           '<div class="empty">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">' +
