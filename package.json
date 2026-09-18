@@ -16,7 +16,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test test/cli/*.test.js test/*.test.js"
+    "test": "node scripts/run-tests.js"
   },
   "repository": {
     "type": "git",
