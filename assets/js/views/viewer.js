@@ -359,6 +359,7 @@
   /* Main render loop                                                     */
   /* ------------------------------------------------------------------ */
   var CHUNK = 150;
+  var MAX_UNTIL_CHUNKS = 20; // cap on chunks rendered synchronously to reach untilUuid (~3000 entries)
 
   // Renders a single transcript entry (filter check, renderer dispatch, date
   // separator, TOC item) and appends it to `conv`/`tocContent`. `r` is the
@@ -470,10 +471,15 @@
     }
     var more = renderNext();
     if (opts.untilUuid) {
-      // If untilUuid never matches (e.g. a stale or unknown uuid), this
-      // renders every remaining chunk — the whole transcript ends up in
-      // the DOM with no sentinel/observer left to attach.
-      while (more && !conv.querySelector('[data-uuid="' + CSS.escape(opts.untilUuid) + '"]')) more = renderNext();
+      // Bounded to MAX_UNTIL_CHUNKS additional chunks so a stale/unknown
+      // uuid can't force the whole transcript into the DOM synchronously
+      // with no sentinel/observer left to attach — after the cap, the
+      // observer takes over and the rest renders lazily as usual.
+      var untilChunks = 0;
+      while (more && untilChunks < MAX_UNTIL_CHUNKS && !conv.querySelector('[data-uuid="' + CSS.escape(opts.untilUuid) + '"]')) {
+        more = renderNext();
+        untilChunks++;
+      }
     }
     if (more) {
       var sentinel = document.createElement('div'); sentinel.className = 'vwr-sentinel'; conv.appendChild(sentinel);
@@ -637,11 +643,32 @@
   function exportHTML() {
     var conv = document.getElementById('vwr-conv');
     if (!conv) return;
+    // Work on a detached clone so the export is complete and static: no
+    // inline event handlers (they won't run outside the app's JS context),
+    // every collapsible section expanded, and every truncated block shown
+    // in full — none of that depends on script running in the exported file.
+    var clone = conv.cloneNode(true);
+    clone.querySelectorAll('[onclick], [onkeydown]').forEach(function (el) {
+      el.removeAttribute('onclick');
+      el.removeAttribute('onkeydown');
+    });
+    clone.querySelectorAll('.vwr-thinking-body, .vwr-tool-body').forEach(function (el) {
+      el.classList.add('vwr-open');
+    });
+    clone.querySelectorAll('.vwr-chevron').forEach(function (el) {
+      el.classList.add('vwr-open');
+    });
+    clone.querySelectorAll('[id$="-full"]').forEach(function (el) {
+      el.style.display = 'inline';
+    });
+    clone.querySelectorAll('[id$="-trunc"]').forEach(function (el) {
+      el.remove();
+    });
     // App-authored CSS from our own stylesheets, not user/session data — safe to inline as-is.
     var css = Array.from(document.styleSheets).map(function (s) {
       try { return Array.from(s.cssRules).map(function (r) { return r.cssText; }).join('\n'); } catch (e) { return ''; }
     }).join('\n');
-    var html = '<!doctype html><html data-theme="' + esc(document.documentElement.dataset.theme || 'dark') + '"><head><meta charset="utf-8"><title>Session export</title><style>' + css + '\nbody{overflow:auto}.vwr-scroll-fab{display:none}</style></head><body><div class="content"><div class="vwr-conv">' + conv.innerHTML + '</div></div></body></html>';
+    var html = '<!doctype html><html data-theme="' + esc(document.documentElement.dataset.theme || 'dark') + '"><head><meta charset="utf-8"><title>Session export</title><style>' + css + '\nbody{overflow:auto}.vwr-scroll-fab{display:none}</style></head><body><div class="content"><div class="vwr-conv">' + clone.innerHTML + '</div></div></body></html>';
     var blob = new Blob([html], { type: 'text/html' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = 'session.html'; a.click();
@@ -904,6 +931,11 @@
               target.classList.add('vwr-target');
               target.scrollIntoView({ block: 'center' });
               setTimeout(function () { target.classList.remove('vwr-target'); }, 2000);
+              // Clear the mount-scoped target after the first successful
+              // scroll so later reRender() calls (e.g. from filter
+              // checkboxes) don't keep passing untilUuid, which would
+              // otherwise force-render extra chunks again on every toggle.
+              turn = '';
             }
           }
           if (find) {
@@ -913,7 +945,11 @@
         });
       }
 
-      CCE.fsaccess.listSessions().then(function (items) {
+      var descriptorsP = CCE.sessionStore.descriptors() != null
+        ? Promise.resolve(CCE.sessionStore.descriptors())
+        : CCE.sessionStore.load().then(function () { return CCE.sessionStore.descriptors(); });
+
+      descriptorsP.then(function (items) {
         var parent = null;
         for (var ii = 0; ii < items.length; ii++) {
           if (items[ii].id === id) { parent = items[ii]; break; }
