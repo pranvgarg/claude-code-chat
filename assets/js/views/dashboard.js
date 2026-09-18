@@ -5,30 +5,10 @@
   /* ------------------------------------------------------------------ */
   /* Helpers                                                              */
   /* ------------------------------------------------------------------ */
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-    });
-  }
-
-  function fmtCost(n) {
-    return '$' + (n || 0).toFixed(2);
-  }
-
-  function fmtTokens(n) {
-    if (!n) return '0';
-    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
-    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
-    return String(n);
-  }
-
-  /* Detect short model class from full model id */
-  function modelClass(fullModel) {
-    if (!fullModel) return 'sonnet';
-    var m = String(fullModel).toLowerCase();
-    if (m.indexOf('opus') !== -1) return 'opus';
-    return 'sonnet';
-  }
+  var esc = CCE.util.esc;
+  var fmtCost = CCE.util.money;
+  var fmtTokens = CCE.util.fmtTokens;
+  var modelClass = CCE.util.modelClass;
 
   /* Return ISO date string YYYY-MM-DD for a timestamp */
   function isoDay(ts) {
@@ -59,6 +39,17 @@
     var d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
     var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return months[d.getMonth()] + ' ' + d.getDate();
+  }
+
+  /* Module-level UI state: which range the toolbar toggle currently selects.
+     0 means "All" (no lower bound). */
+  var state = { days: 30 };
+
+  /* Filter session summaries to those active within state.days (0 = all). */
+  function filterByDays(list) {
+    if (!state.days) return list;
+    var cutoff = Date.now() - state.days * 86400000;
+    return list.filter(function (s) { return s.lastTs && Date.parse(s.lastTs) >= cutoff; });
   }
 
   /* Bar colors cycle for projects */
@@ -281,12 +272,15 @@
       var proj = (s.displayPath || CCE.sessionIndex.projectDisplayPath(s.projectFolder || '') || '').split('/').pop() || s.displayPath || '';
       var prompt = s.prompt || '(no prompt)';
       if (prompt.length > 80) prompt = prompt.slice(0, 80) + '…';
+      var estBadge = s.unknownModel
+        ? '<span class="badge-est" title="Estimated with fallback rates: unknown model">est.</span>'
+        : '';
       return '<div class="dash-trow" data-id="' + esc(s.id) + '">' +
         '<div class="dash-td dash-td-prompt">' + esc(prompt) + '</div>' +
         '<div class="dash-td" style="font-family:var(--font-mono);font-size:11px">' + esc(proj) + '</div>' +
         '<div class="dash-td"><span class="dash-model-tag ' + esc(cls) + '">' + esc(modelLabel) + '</span></div>' +
         '<div class="dash-td">' + esc(String(s.msgs || 0)) + '</div>' +
-        '<div class="dash-td"><span class="dash-cost-val">' + esc(fmtCost(s.cost)) + '</span></div>' +
+        '<div class="dash-td"><span class="dash-cost-val">' + esc(fmtCost(s.cost)) + '</span>' + estBadge + '</div>' +
       '</div>';
     }).join('');
 
@@ -410,8 +404,30 @@
     var shellToolbar = document.getElementById('toolbar-actions');
     if (shellToolbar) {
       shellToolbar.innerHTML =
-        '<span style="font-size:12px;color:var(--text-dim);font-family:var(--font-mono)">Usage &amp; Cost</span>';
+        '<span class="doc-title">Usage &amp; Cost</span><div class="spacer"></div>' +
+        '<div class="seg" id="dash-range">' +
+          '<button data-days="7"' + (state.days === 7 ? ' class="on"' : '') + '>7d</button>' +
+          '<button data-days="30"' + (state.days === 30 ? ' class="on"' : '') + '>30d</button>' +
+          '<button data-days="90"' + (state.days === 90 ? ' class="on"' : '') + '>90d</button>' +
+          '<button data-days="0"' + (!state.days ? ' class="on"' : '') + '>All</button>' +
+        '</div>';
     }
+  }
+
+  /* Wire clicks on the toolbar's range toggle to `onChange`, keeping
+     `state.days` and the `.on` class in sync with the clicked button. */
+  function wireRangeToggle(onChange) {
+    var seg = document.getElementById('dash-range');
+    if (!seg) return;
+    seg.addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-days]');
+      if (!btn) return;
+      state.days = parseInt(btn.getAttribute('data-days'), 10) || 0;
+      seg.querySelectorAll('button').forEach(function (b) {
+        b.classList.toggle('on', b === btn);
+      });
+      onChange();
+    });
   }
 
   /* ------------------------------------------------------------------ */
@@ -423,13 +439,25 @@
       clearToolbar();
       renderLoading(root);
 
+      var allSummaries = null;
+
+      function show(list) {
+        allSummaries = list;
+        if (list.length === 0) renderEmpty(root);
+        else renderDashboard(root, filterByDays(list));
+      }
+
+      wireRangeToggle(function () {
+        if (allSummaries) show(allSummaries);
+      });
+
       var data = CCE.sessionStore.all();
       if (data) {
-        if (data.length === 0) renderEmpty(root); else renderDashboard(root, data);
+        show(data);
         return;
       }
       CCE.sessionStore.load().then(function (results) {
-        if (results.length === 0) renderEmpty(root); else renderDashboard(root, results);
+        show(results);
       }).catch(function (err) {
         console.error('[CCE dashboard] load failed:', err);
         renderError(root, err && err.message ? err.message : String(err));

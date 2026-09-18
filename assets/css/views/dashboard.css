@@ -102,6 +102,7 @@
 .dash-model-tag.opus   { background: color-mix(in srgb, var(--c-assistant) 12%, transparent); color: var(--c-assistant); border: 1px solid color-mix(in srgb, var(--c-assistant) 22%, transparent); }
 .dash-model-tag.sonnet { background: color-mix(in srgb, var(--c-user) 12%, transparent); color: var(--c-user); border: 1px solid color-mix(in srgb, var(--c-user) 22%, transparent); }
 .dash-cost-val { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--c-cost); font-weight: 500; }
+.badge-est { font-size: var(--fs-xs); color: var(--c-thinking); margin-left:6px; }
 .dash-empty-small { font-size: 12.5px; color: var(--text-faint); padding: 20px; text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
 
 @media (max-width: 900px) {

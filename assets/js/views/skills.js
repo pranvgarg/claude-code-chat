@@ -3,60 +3,6 @@
   var CCE = g.CCE = g.CCE || {};
 
   /* ------------------------------------------------------------------ */
-  /* Frontmatter parse helper                                             */
-  /* ------------------------------------------------------------------ */
-  function parseFrontmatter(text, fallbackName) {
-    var result = { name: fallbackName, description: '' };
-    if (!text || text.slice(0, 3) !== '---') return result;
-
-    var lines = text.split('\n');
-    var end = -1;
-    for (var i = 1; i < lines.length; i++) {
-      if (lines[i].trimRight() === '---') { end = i; break; }
-    }
-    if (end === -1) return result;
-
-    for (var j = 1; j < end; j++) {
-      var line = lines[j];
-      var colon = line.indexOf(':');
-      if (colon === -1) continue;
-      var key = line.slice(0, colon).trim();
-      var val = line.slice(colon + 1).trim();
-      // Strip surrounding quotes (single or double)
-      if ((val.charAt(0) === '"' && val.charAt(val.length - 1) === '"') ||
-          (val.charAt(0) === "'" && val.charAt(val.length - 1) === "'")) {
-        val = val.slice(1, val.length - 1);
-      }
-      if (key === 'name') result.name = val || fallbackName;
-      if (key === 'description') {
-        // YAML folded/literal block scalar (`>` or `|`): the text is on the
-        // following more-indented lines.
-        if (val === '' || val === '>' || val === '|' || val === '>-' || val === '|-') {
-          var collected = [];
-          var k = j + 1;
-          for (; k < end && /^\s+\S/.test(lines[k]); k++) collected.push(lines[k].trim());
-          val = collected.join(' ');
-          j = k - 1; // skip the consumed continuation lines
-        }
-        result.description = val;
-      }
-    }
-    return result;
-  }
-
-  /* Remove the leading `--- ... ---` frontmatter block before rendering the body */
-  function stripFrontmatter(text) {
-    if (!text || text.slice(0, 3) !== '---') return text || '';
-    var lines = text.split('\n');
-    for (var i = 1; i < lines.length; i++) {
-      if (lines[i].trimRight() === '---') {
-        return lines.slice(i + 1).join('\n').replace(/^\n+/, '');
-      }
-    }
-    return text;
-  }
-
-  /* ------------------------------------------------------------------ */
   /* View registration                                                    */
   /* ------------------------------------------------------------------ */
   CCE.router.register('#/skills', {
@@ -90,7 +36,7 @@
         entry.read().then(function (text) {
           bodyEl.innerHTML =
             '<div class="vwr-md-content">' +
-            CCE.markdown.render(stripFrontmatter(text)) +
+            CCE.markdown.render(CCE.markdown.stripFrontmatter(text)) +
             '</div>';
         }).catch(function (err) {
           bodyEl.innerHTML =
@@ -153,7 +99,7 @@
         var userReads = userSkills.map(function (skill) {
           return skill.read()
             .then(function (text) {
-              var fm = parseFrontmatter(text, skill.name);
+              var fm = CCE.markdown.parseFrontmatter(text, skill.name);
               return { skill: skill, text: text, fm: fm };
             })
             .catch(function () {
@@ -174,13 +120,14 @@
 
             var desc = item.fm.description;
             var descTrunc = desc.length > 90 ? desc.slice(0, 90) + '…' : desc;
-            var label = item.skill.namespace ? (item.skill.namespace + ':' + item.skill.name) : (item.fm.name || item.skill.name);
+            var key = item.skill.namespace ? (item.skill.namespace + ':' + item.skill.name) : item.skill.name;
+            var label = item.fm.name && !item.skill.namespace ? item.fm.name : key;
 
             if (firstUserIdx === -1) firstUserIdx = entryIdx;
 
             html +=
               '<div class="doc-item" data-skill-idx="' + entryIdx + '" data-open-key="' +
-              CCE.markdown.esc(label) + '">' +
+              CCE.markdown.esc(key) + '">' +
               '<strong>' + CCE.markdown.esc(label) + '</strong>' +
               (descTrunc
                 ? '<div class="doc-item-desc">' + CCE.markdown.esc(descTrunc) + '</div>'
@@ -253,7 +200,7 @@
             if (firstUserItem && firstUserItem.text) {
               bodyEl.innerHTML =
                 '<div class="vwr-md-content">' +
-                CCE.markdown.render(stripFrontmatter(firstUserItem.text)) +
+                CCE.markdown.render(CCE.markdown.stripFrontmatter(firstUserItem.text)) +
                 '</div>';
             }
           } else if (pluginSkills.length > 0) {
