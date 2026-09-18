@@ -911,6 +911,24 @@
     }).catch(function () { return null; });
   }
 
+  /* Pure helper: find hooks/<name> (direct child of a top-level 'hooks' dir)
+     in a flat file list. Returns the matching file entry, or null. */
+  function hookScriptFromFileList(fileList, name) {
+    for (var i = 0; i < fileList.length; i++) {
+      var f = fileList[i], parts = (f.webkitRelativePath || f.relPath || '').split('/');
+      var hi = parts.indexOf('hooks');
+      if (hi !== -1 && parts.length === hi + 2 && parts[hi + 1] === name) return f;
+    }
+    return null;
+  }
+
+  /* readHookScript — text of hooks/<name> under the connected root, or
+     null if not found. Returns Promise<string|null>. */
+  function readHookScript(name) {
+    var f = hookScriptFromFileList(_files, name);
+    return f ? f.text() : Promise.resolve(null);
+  }
+
   /* ------------------------------------------------------------------ */
   /* Public surface                                                       */
   /* ------------------------------------------------------------------ */
@@ -931,6 +949,7 @@
     restoreProjectHandle: restoreProjectHandle,
     reconnectProjectHandle: reconnectProjectHandle,
     listAttachedProjectFolders: listAttachedProjectFolders,
+    readHookScript: readHookScript,
     // Exposed for unit testing only:
     _sessionsFromFileList: sessionsFromFileList,
     _subagentsFromFileList: subagentsFromFileList,
@@ -942,7 +961,8 @@
     _commandsFromFileList: commandsFromFileList,
     _pluginCommandsFromFileList: pluginCommandsFromFileList,
     _findClaudeMd: findClaudeMd,
-    _describeSession: describeSession
+    _describeSession: describeSession,
+    _hookScriptFromFileList: hookScriptFromFileList
   };
 
   CCE.connect = {
