@@ -5,6 +5,7 @@
   var ROLE_LABEL = { user: 'You', assistant: 'Claude', thinking: 'Thinking', tool_input: 'Tool', tool_result: 'Result' };
   var ROLE_COLOR = { user: 'var(--c-user)', assistant: 'var(--c-assistant)', thinking: 'var(--c-thinking)', tool_input: 'var(--c-tool)', tool_result: 'var(--c-tool)' };
   var SNIPPETS_PER_GROUP = 3, GROUPS_WITH_SNIPPETS = 10;
+  var _mountToken = 0;
 
   function params() {
     var p = new URLSearchParams(location.hash.split('?')[1] || '');
@@ -46,7 +47,7 @@
       '<span class="srch-row-body"><span class="srch-role" style="color:' + ROLE_COLOR[turn.role] + '">' + ROLE_LABEL[turn.role] + '</span>' +
       '<span class="srch-snippet">' + html + '</span></span></a>';
   }
-  function fillSnippets(section, hit, desc, terms) {
+  function fillSnippets(section, hit, desc, terms, query) {
     var rows = section.querySelector('.srch-rows');
     if (!rows || rows.getAttribute('data-loaded') === '1') return Promise.resolve();
     rows.setAttribute('data-loaded', '1');
@@ -57,7 +58,10 @@
         var t = turns[i]; if (!t) return '';
         return rowHTML(desc.id, t, CCE.searchIndex.snippet(t.text, terms).html);
       }).join('') + (hit.turnIdxs.length > shown.length
-        ? '<a class="srch-more" href="#/viewer?id=' + encodeURIComponent(desc.id) + '&find=' + encodeURIComponent(terms.join(' ')) + '">Show ' + (hit.turnIdxs.length - shown.length) + ' more in this session</a>'
+        // Pass the raw query (not the tokenized terms) so the viewer's
+        // find= search box behaves the same as it would if the user had
+        // typed the original query directly.
+        ? '<a class="srch-more" href="#/viewer?id=' + encodeURIComponent(desc.id) + '&find=' + encodeURIComponent(query) + '">Show ' + (hit.turnIdxs.length - shown.length) + ' more in this session</a>'
         : '');
     }).catch(function () { rows.innerHTML = '<div class="srch-loading">Could not load this session.</div>'; });
   }
@@ -65,6 +69,7 @@
   CCE.router.register('#/search', {
     title: 'Search',
     mount: function (root) {
+      var myToken = ++_mountToken;
       var p = params();
       if (CCE.app.syncSearchBox) CCE.app.syncSearchBox(p.q);
       var actions = document.getElementById('toolbar-actions');
@@ -82,6 +87,10 @@
       CCE.sessionStore.load().then(function () {
         return CCE.searchStore.ensureBuilt(function (pr) { if (status) status.textContent = 'Indexing ' + pr.done + ' / ' + pr.total; });
       }).then(function () {
+        // A late resolution (e.g. the user navigated away and back, or to
+        // another view, while indexing was in flight) must not build an
+        // observer or touch a #view-root that this mount no longer owns.
+        if (myToken !== _mountToken) return;
         if (status) status.textContent = 'Index: ' + CCE.searchStore.size() + ' sessions';
         var hits = CCE.searchStore.search(p.q, p.scope);
         var sums = summaryByKey(), descs = descByKey();
@@ -95,14 +104,14 @@
         var chain = Promise.resolve();
         hits.slice(0, GROUPS_WITH_SNIPPETS).forEach(function (h) {
           var section = results.querySelector('.srch-group[data-key="' + CSS.escape(h.key) + '"]');
-          if (section && descs[h.key]) chain = chain.then(function () { return fillSnippets(section, h, descs[h.key], terms); });
+          if (section && descs[h.key]) chain = chain.then(function () { return fillSnippets(section, h, descs[h.key], terms, p.q); });
         });
         var io = new IntersectionObserver(function (entries) {
           entries.forEach(function (en) {
             if (!en.isIntersecting) return;
             var key = en.target.getAttribute('data-key');
             var h = hits.find(function (x) { return x.key === key; });
-            if (h && descs[key]) fillSnippets(en.target, h, descs[key], terms);
+            if (h && descs[key]) fillSnippets(en.target, h, descs[key], terms, p.q);
             io.unobserve(en.target);
           });
         }, { root: document.getElementById('view-root'), rootMargin: '400px' });
@@ -113,6 +122,11 @@
       });
     },
     unmount: function () {
+      // Invalidate this mount's token so a late ensureBuilt() resolution
+      // (e.g. the user navigated to a different view entirely, not back to
+      // #/search) bails out instead of building an observer against a
+      // #view-root this mount no longer owns.
+      _mountToken++;
       var root = document.getElementById('view-root');
       if (root && root._srchObserver) { root._srchObserver.disconnect(); root._srchObserver = null; }
     }
