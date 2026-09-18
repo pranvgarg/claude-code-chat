@@ -181,3 +181,19 @@ test('HEAD returns headers without a body, POST returns 405, foreign Host return
   server.close();
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('does not serve a symlink inside an allow-listed dir that points outside the allow-listed roots', async () => {
+  if (process.platform === 'win32') return;
+  const dir = makeFixtureDir();
+  fs.writeFileSync(path.join(dir, 'secret.txt'), 'SECRET');
+  // Symlink lives inside assets/ (allow-listed) but resolves to a file at
+  // the repo root, which is outside the allow-listed roots (index.html, assets).
+  fs.symlinkSync(path.join(dir, 'secret.txt'), path.join(dir, 'assets', 'leak.js'));
+  const server = await startServer(dir);
+  const port = server.address().port;
+  const res = await request(port, '/assets/leak.js');
+  assert.strictEqual(res.status, 404);
+  assert.doesNotMatch(res.body, /SECRET/);
+  server.close();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
