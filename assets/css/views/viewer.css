@@ -336,3 +336,7 @@ mark.vwr-active-match { background: rgba(255,200,50,.6); outline: 2px solid rgba
     position: fixed; top: 0; left: 0; height: 100vh; z-index: 200; width: 260px;
   }
 }
+
+/* ---- Deep-link target (turn=<uuid>) + chunked-render sentinel ---- */
+.vwr-target { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--r-sm); }
+.vwr-sentinel { height: 1px; }

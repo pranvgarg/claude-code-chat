@@ -132,7 +132,9 @@
     search: '',
     searchIndex: 0,
     searchMatches: [],
-    sidebarOpen: false
+    sidebarOpen: false,
+    render: null,
+    io: null
   };
 
   // Scroll listener for the progress bar + scroll-to-bottom FAB.
@@ -356,114 +358,127 @@
   /* ------------------------------------------------------------------ */
   /* Main render loop                                                     */
   /* ------------------------------------------------------------------ */
-  function renderConversation(conv, tocContent) {
-    conv.innerHTML = '';
-    if (tocContent) tocContent.innerHTML = '';
+  var CHUNK = 150;
 
-    var entries = _state.entries;
+  // Renders a single transcript entry (filter check, renderer dispatch, date
+  // separator, TOC item) and appends it to `conv`/`tocContent`. `r` is the
+  // shared render cursor (`_state.render`): { i, entryIdx, lastDateStr,
+  // lastTimestamp }. Mutates r.entryIdx / r.lastDateStr / r.lastTimestamp so
+  // chunked calls continue seamlessly from where the previous chunk left off.
+  function appendEntry(conv, tocContent, entry, r) {
     var toolResults = _state.toolResults;
     var search = _state.search;
     var filters = _state.filters;
+    var type = entry.type;
 
-    var entryIdx = 0;
-    var lastDateStr = '';
-    var lastTimestamp = null;
-    var tocItems = [];
+    // Filter logic
+    if (type === 'user') {
+      if (!filters.user) return;
+      // Skip pure tool-result-only user turns
+      if (entry.toolUseResult !== undefined && !entry.message) return;
+      if (entry.toolUseResult !== undefined) {
+        var c = entry.message && entry.message.content;
+        if (typeof c === 'string' && c.trim() === '') return;
+        if (Array.isArray(c) && c.every(function (b) { return b.type === 'tool_result'; })) return;
+      }
+    } else if (type === 'assistant') {
+      if (!filters.assistant) return;
+    } else if (type === 'system') {
+      if (!filters.system) return;
+    } else if (type === 'progress') {
+      if (!filters.progress) return;
+    } else if (type === 'file-history-snapshot') {
+      if (!filters.snapshot) return;
+    } else if (type === 'last-prompt') {
+      if (!filters.system) return;
+    } else {
+      return;
+    }
 
-    for (var i = 0; i < entries.length; i++) {
-      var entry = entries[i];
-      var type = entry.type;
+    var el = null;
+    if (type === 'user')                   el = renderUser(entry, search, r.lastTimestamp);
+    else if (type === 'assistant')         el = renderAssistant(entry, search, r.lastTimestamp, toolResults);
+    else if (type === 'system')            el = renderSystem(entry, search, r.lastTimestamp);
+    else if (type === 'progress')          el = renderProgress(entry, search);
+    else if (type === 'file-history-snapshot') el = renderSnapshot(entry);
+    else if (type === 'last-prompt')       el = renderLastPrompt(entry, search);
 
-      // Filter logic
-      if (type === 'user') {
-        if (!filters.user) continue;
-        // Skip pure tool-result-only user turns
-        if (entry.toolUseResult !== undefined && !entry.message) continue;
-        if (entry.toolUseResult !== undefined) {
-          var c = entry.message && entry.message.content;
-          if (typeof c === 'string' && c.trim() === '') continue;
-          if (Array.isArray(c) && c.every(function (b) { return b.type === 'tool_result'; })) continue;
+    if (!el) return;
+
+    // Date separator
+    if (entry.timestamp) {
+      try {
+        var dateStr = new Date(entry.timestamp).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        if (dateStr !== r.lastDateStr) {
+          var sep = document.createElement('div');
+          sep.className = 'vwr-date-separator';
+          sep.innerHTML = '<span>' + esc(dateStr) + '</span>';
+          conv.appendChild(sep);
+          r.lastDateStr = dateStr;
         }
-      } else if (type === 'assistant') {
-        if (!filters.assistant) continue;
-      } else if (type === 'system') {
-        if (!filters.system) continue;
-      } else if (type === 'progress') {
-        if (!filters.progress) continue;
-      } else if (type === 'file-history-snapshot') {
-        if (!filters.snapshot) continue;
-      } else if (type === 'last-prompt') {
-        if (!filters.system) continue;
-      } else {
-        continue;
-      }
-
-      var el = null;
-      if (type === 'user')                   el = renderUser(entry, search, lastTimestamp);
-      else if (type === 'assistant')         el = renderAssistant(entry, search, lastTimestamp, toolResults);
-      else if (type === 'system')            el = renderSystem(entry, search, lastTimestamp);
-      else if (type === 'progress')          el = renderProgress(entry, search);
-      else if (type === 'file-history-snapshot') el = renderSnapshot(entry);
-      else if (type === 'last-prompt')       el = renderLastPrompt(entry, search);
-
-      if (!el) continue;
-
-      // Date separator
-      if (entry.timestamp) {
-        try {
-          var dateStr = new Date(entry.timestamp).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-          if (dateStr !== lastDateStr) {
-            var sep = document.createElement('div');
-            sep.className = 'vwr-date-separator';
-            sep.innerHTML = '<span>' + esc(dateStr) + '</span>';
-            conv.appendChild(sep);
-            lastDateStr = dateStr;
-          }
-        } catch (e) {}
-      }
-
-      el.setAttribute('data-entry-idx', String(entryIdx));
-      conv.appendChild(el);
-
-      // TOC entries (user + assistant only)
-      if (tocContent && (type === 'user' || type === 'assistant')) {
-        tocItems.push({ el: el, type: type, ts: fmtTime(entry.timestamp) });
-      }
-
-      entryIdx++;
-      if (entry.timestamp) lastTimestamp = entry.timestamp;
+      } catch (e) {}
     }
 
-    // Build TOC
-    if (tocContent) {
-      for (var ti = 0; ti < tocItems.length; ti++) {
-        (function (item) {
-          var previewEl = item.el.querySelector('.vwr-text-content') || item.el.querySelector('.vwr-md-content');
-          var previewText = previewEl ? previewEl.textContent.slice(0, 50).trim() : item.el.textContent.slice(0, 50).trim();
-          var tocItem = document.createElement('div');
-          var tocCls = item.type === 'user' ? 'vwr-toc-user' : 'vwr-toc-assistant';
-          tocItem.className = 'vwr-toc-item ' + tocCls;
-          tocItem.innerHTML =
-            '<span class="vwr-toc-role">' + esc(item.type === 'user' ? 'User' : 'Assistant') + '</span>' +
-            '<span class="vwr-toc-preview">' + esc(previewText) + '</span>' +
-            (item.ts ? '<span class="vwr-toc-time">' + esc(item.ts) + '</span>' : '');
-          tocItem.addEventListener('click', function () {
-            item.el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          });
-          tocContent.appendChild(tocItem);
-        })(tocItems[ti]);
-      }
+    el.setAttribute('data-entry-idx', String(r.entryIdx));
+    el.setAttribute('data-uuid', entry.uuid || '');
+    conv.appendChild(el);
+
+    // TOC entry (user + assistant only), appended immediately so the TOC
+    // grows incrementally with each rendered chunk.
+    if (tocContent && (type === 'user' || type === 'assistant')) {
+      var previewEl = el.querySelector('.vwr-text-content') || el.querySelector('.vwr-md-content');
+      var previewText = previewEl ? previewEl.textContent.slice(0, 50).trim() : el.textContent.slice(0, 50).trim();
+      var itemTs = fmtTime(entry.timestamp);
+      var tocItem = document.createElement('div');
+      var tocCls = type === 'user' ? 'vwr-toc-user' : 'vwr-toc-assistant';
+      tocItem.className = 'vwr-toc-item ' + tocCls;
+      tocItem.innerHTML =
+        '<span class="vwr-toc-role">' + esc(type === 'user' ? 'User' : 'Assistant') + '</span>' +
+        '<span class="vwr-toc-preview">' + esc(previewText) + '</span>' +
+        (itemTs ? '<span class="vwr-toc-time">' + esc(itemTs) + '</span>' : '');
+      tocItem.addEventListener('click', function () {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      tocContent.appendChild(tocItem);
     }
 
-    // Search nav
-    if (search) {
-      updateSearchNav(conv);
-    }
+    r.entryIdx++;
+    if (entry.timestamp) r.lastTimestamp = entry.timestamp;
+  }
 
-    // Inject copy buttons + language labels into every code block.
-    // Uses DOM construction (no inline onclick) so listeners are cleaned
-    // up when the conv element is replaced on next render.
-    injectCodeCopyButtons(conv);
+  // Renders the transcript in chunks of CHUNK entries. The first chunk (plus
+  // any further chunks needed to reach opts.untilUuid) renders synchronously;
+  // remaining entries render lazily as a sentinel scrolls into view.
+  function renderConversation(conv, tocContent, opts) {
+    opts = opts || {};
+    conv.innerHTML = ''; if (tocContent) tocContent.innerHTML = '';
+    if (_state.io) { _state.io.disconnect(); _state.io = null; }
+    _state.render = { i: 0, entryIdx: 0, lastDateStr: '', lastTimestamp: null };
+    function renderNext() {
+      var r = _state.render, end = Math.min(_state.entries.length, r.i + CHUNK);
+      while (r.i < end) { appendEntry(conv, tocContent, _state.entries[r.i], r); r.i++; }
+      // Inject copy buttons + language labels into any new code blocks.
+      // Uses DOM construction (no inline onclick) so listeners are cleaned
+      // up when the conv element is replaced on next render. Already-
+      // augmented blocks (from a prior chunk) are skipped internally.
+      injectCodeCopyButtons(conv);
+      if (_state.search) updateSearchNav(conv);
+      return r.i < _state.entries.length;
+    }
+    var more = renderNext();
+    if (opts.untilUuid) {
+      while (more && !conv.querySelector('[data-uuid="' + CSS.escape(opts.untilUuid) + '"]')) more = renderNext();
+    }
+    if (more) {
+      var sentinel = document.createElement('div'); sentinel.className = 'vwr-sentinel'; conv.appendChild(sentinel);
+      _state.io = new IntersectionObserver(function (en) {
+        if (!en[0].isIntersecting) return;
+        var still = renderNext();
+        conv.appendChild(sentinel);
+        if (!still) { _state.io.disconnect(); _state.io = null; sentinel.remove(); }
+      }, { root: document.getElementById('view-root'), rootMargin: '800px' });
+      _state.io.observe(sentinel);
+    }
   }
 
   function injectCodeCopyButtons(conv) {
@@ -628,12 +643,13 @@
       var scroller = document.getElementById('view-root');
       if (scroller && _scrollHandler) scroller.removeEventListener('scroll', _scrollHandler);
       _scrollHandler = null;
+      if (_state.io) { _state.io.disconnect(); _state.io = null; }
     },
     mount: function (root) {
       /* ---- 1. Parse session id (+ optional subagent) from hash query ---- */
       var hash = location.hash || '';
       var qIdx = hash.indexOf('?');
-      var id = '', sub = '';
+      var id = '', sub = '', turn = '', find = '';
       if (qIdx !== -1) {
         var params = hash.slice(qIdx + 1).split('&');
         for (var pi = 0; pi < params.length; pi++) {
@@ -641,6 +657,8 @@
           var val = decodeURIComponent(kv.slice(1).join('='));
           if (kv[0] === 'id') id = val;
           else if (kv[0] === 'sub') sub = val;
+          else if (kv[0] === 'turn') turn = val;
+          else if (kv[0] === 'find') find = val;
         }
       }
 
@@ -729,7 +747,7 @@
 
       /* ---- 4. Wire toolbar controls ---- */
       function reRender() {
-        renderConversation(conv, tocContent);
+        renderConversation(conv, tocContent, { untilUuid: turn });
         var navEl = document.getElementById('vwr-search-nav');
         if (_state.search) {
           updateSearchNav(conv, navEl);
@@ -863,6 +881,19 @@
           _state.searchMatches = [];
           buildMeta(entries, prefixHtml);
           reRender();
+          if (turn) {
+            renderConversation(conv, tocContent, { untilUuid: turn });
+            var target = conv.querySelector('[data-uuid="' + CSS.escape(turn) + '"]');
+            if (target) {
+              target.classList.add('vwr-target');
+              target.scrollIntoView({ block: 'center' });
+              setTimeout(function () { target.classList.remove('vwr-target'); }, 2000);
+            }
+          }
+          if (find) {
+            var box = document.getElementById('vwr-search-box');
+            if (box) { box.value = find; box.dispatchEvent(new Event('input')); }
+          }
         });
       }
 
