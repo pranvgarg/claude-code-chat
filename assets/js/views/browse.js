@@ -115,8 +115,12 @@
       '</div>';
   }
 
-  function renderList(d, from, to) {
-    var slice = d.slice(from, to);
+  /* Last group key rendered by the previous renderList page, so an           */
+  /* appended page can tell whether it is continuing a group whose header     */
+  /* already rendered on the prior page (see renderStage's paging loop).      */
+  var _listLastGroupKey = null;
+
+  function renderList(d, from, to, lastGroupKey) {
     var head = from === 0 ? '<div class="lhead">' +
       '<span>Prompt</span><span>Project</span><span>Model</span>' +
       '<span style="text-align:right">Msgs</span>' +
@@ -126,28 +130,41 @@
 
     var rows;
     if (state.group === 'By project') {
+      /* Group the FULL array (not the page slice) so a project's count/cost  */
+      /* totals are correct and its header renders exactly once, even when    */
+      /* its sessions straddle a page boundary.                               */
       var groups = {};
       var order  = [];
-      slice.forEach(function (s) {
+      d.forEach(function (s) {
         var key = s.displayPath || s.projectFolder || '(unknown)';
         if (!groups[key]) { groups[key] = []; order.push(key); }
         groups[key].push(s);
       });
-      rows = '';
-      order.forEach(function (proj) {
-        var items = groups[proj];
-        var c = items.reduce(function (a, s) { return a + (s.cost || 0); }, 0);
-        rows += '<div class="lgroup">' +
-          '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">' +
-          '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>' +
-          '</svg>' + esc(proj) +
-          '<span class="g-count">' + items.length + ' session' + (items.length !== 1 ? 's' : '') + '</span>' +
-          '<span class="g-cost cost">' + money(c) + '</span>' +
-          '</div>';
-        rows += items.map(rowHTML).join('');
+      var flat = [];
+      order.forEach(function (key) {
+        groups[key].forEach(function (s) { flat.push({ key: key, session: s }); });
       });
+
+      rows = '';
+      var currentKey = from === 0 ? null : lastGroupKey;
+      flat.slice(from, to).forEach(function (entry) {
+        if (entry.key !== currentKey) {
+          var items = groups[entry.key];
+          var c = items.reduce(function (a, s) { return a + (s.cost || 0); }, 0);
+          rows += '<div class="lgroup">' +
+            '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">' +
+            '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>' +
+            '</svg>' + esc(entry.key) +
+            '<span class="g-count">' + items.length + ' session' + (items.length !== 1 ? 's' : '') + '</span>' +
+            '<span class="g-cost cost">' + money(c) + '</span>' +
+            '</div>';
+          currentKey = entry.key;
+        }
+        rows += rowHTML(entry.session);
+      });
+      _listLastGroupKey = currentKey;
     } else {
-      rows = slice.map(rowHTML).join('');
+      rows = d.slice(from, to).map(rowHTML).join('');
     }
 
     var body = head + rows;
@@ -218,7 +235,15 @@
   /* ------------------------------------------------------------------ */
   /* Render into stage element                                            */
   /* ------------------------------------------------------------------ */
+  /* Windowed-render pagination observer — one at a time. renderStage may be  */
+  /* re-invoked (filter/sort/group/view change) while a previous observer is  */
+  /* still watching a now-discarded sentinel, so it must be disconnected      */
+  /* before a new one is created.                                            */
+  var _pageObserver = null;
+
   function renderStage(stage, totalEl, eyebrowEl, summaries) {
+    if (_pageObserver) { _pageObserver.disconnect(); _pageObserver = null; }
+
     var d = applyFilter(summaries);
 
     var total = d.reduce(function (a, s) { return a + (s.cost || 0); }, 0);
@@ -246,16 +271,16 @@
       var sentinel = document.createElement('div');
       sentinel.className = 'cce-sentinel'; sentinel.setAttribute('aria-hidden', 'true');
       stage.appendChild(sentinel);
-      var io = new IntersectionObserver(function (en) {
+      _pageObserver = new IntersectionObserver(function (en) {
         if (!en[0].isIntersecting) return;
         var tmp = document.createElement('div');
-        tmp.innerHTML = renderer(d, rendered, rendered + PAGE);
+        tmp.innerHTML = renderer(d, rendered, rendered + PAGE, _listLastGroupKey);
         while (tmp.firstChild) container.appendChild(tmp.firstChild);
         rendered += PAGE;
         wireItems(container);
-        if (rendered >= d.length) { io.disconnect(); sentinel.remove(); }
+        if (rendered >= d.length) { _pageObserver.disconnect(); _pageObserver = null; sentinel.remove(); }
       }, { root: document.getElementById('view-root'), rootMargin: '600px' });
-      io.observe(sentinel);
+      _pageObserver.observe(sentinel);
     }
     wireItems(container);
   }
