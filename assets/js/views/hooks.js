@@ -5,9 +5,16 @@
   var EVENT_ORDER = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop', 'SubagentStop', 'PreCompact', 'SessionEnd'];
 
   /* Extract a hooks/<name> script filename from a hook command string, e.g.
-     "~/.claude/hooks/session-start.sh --flag" -> "session-start.sh". */
+     "~/.claude/hooks/session-start.sh --flag" -> "session-start.sh".
+     Anchored to a local ~/.claude/hooks/ path: requires the segment right
+     before the captured name to be exactly "hooks" under ".claude" reached
+     via "~", "$HOME", or an absolute filesystem path (not a URL), and the
+     captured name itself must not contain a further "/" (so nested paths
+     like hooks/sub/dir.sh, and non-local paths like a URL's
+     ".claude/hooks/x.sh", are rejected). */
+  var HOOK_SCRIPT_RE = /(?:^|[\s"'=])(?:~|\$HOME|(?:\/[^\s"'\/]+)+)\/\.claude\/hooks\/([A-Za-z0-9._-]+)(?=$|[\s"';&|)])/;
   function scriptNameFrom(command) {
-    var m = /(?:^|[\s"'])(?:~\/\.claude|\$HOME\/\.claude|[^\s"']*\/\.claude)\/hooks\/([A-Za-z0-9._-]+)/.exec(command || '');
+    var m = HOOK_SCRIPT_RE.exec(command || '');
     return m ? m[1] : null;
   }
 
@@ -39,7 +46,7 @@
       var script = scriptNameFrom(r.command);
       html += '<div class="hooks-card">' +
         '<div class="hooks-matcher">matcher: <code>' + esc(r.matcher) + '</code>' + (r.timeout ? ' · timeout ' + esc(r.timeout) + 's' : '') + '</div>' +
-        '<div class="hooks-cmd">' + esc(r.command) + '</div>' +
+        (r.command ? '<div class="hooks-cmd">' + esc(r.command) + '</div>' : '') +
         (script ? '<details class="hooks-script" data-script="' + esc(script) + '" data-idx="' + i + '"><summary>Preview ~/.claude/hooks/' + esc(script) + '</summary><pre class="hooks-pre"><code>Loading…</code></pre></details>' : '') +
         '</div>';
     });
@@ -84,4 +91,7 @@
       });
     }
   });
+
+  // Exposed for unit testing only:
+  CCE.hooksView = { _scriptNameFrom: scriptNameFrom };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
