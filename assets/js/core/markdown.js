@@ -3,23 +3,17 @@
   const CCE = g.CCE = g.CCE || {};
 
   /* ------------------------------------------------------------------ */
-  /* Escape helper: uses the DOM textContent trick so no regex needed.   */
-  /* In a non-browser environment (Node), falls back to a simple regex.  */
+  /* Escape helper: pure regex escape (matches CCE.util.esc). Must NOT   */
+  /* use the DOM textContent/innerHTML trick — that does not escape     */
+  /* quotes, and this value is interpolated into HTML attributes         */
+  /* (e.g. data-open-key="...") by skills.js / commands.js / memory.js / */
+  /* plans.js.                                                            */
   /* ------------------------------------------------------------------ */
   function esc(s) {
-    if (typeof s !== 'string') s = String(s);
-    if (g.document && g.document.createElement) {
-      var el = g.document.createElement('span');
-      el.textContent = s;
-      return el.innerHTML;
-    }
-    // Fallback (non-DOM environments, e.g. node --check syntax pass)
-    return s
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
   }
 
   /* ------------------------------------------------------------------ */
