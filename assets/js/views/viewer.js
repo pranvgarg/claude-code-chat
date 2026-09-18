@@ -7,6 +7,10 @@
   /* ------------------------------------------------------------------ */
   var esc = CCE.util.esc, debounce = CCE.util.debounce, fmtTime = CCE.util.fmtTime;
 
+  // Cap on characters sent through Prism (or otherwise inlined) for any
+  // single tool-input rendering; larger inputs collapse behind "Show full".
+  var MAX_TOOL_INPUT = 3000;
+
   function highlight(html, term) {
     if (!term) return html;
     var re = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
@@ -240,22 +244,23 @@
         var summary = toolSummary(name, input);
         var lang = detectLang(name, input);
         var highlightedInput;
-        if (name === 'Write' && !search && inputStr.length > 3000) {
+        if (name === 'Write' && !search && inputStr.length > MAX_TOOL_INPUT) {
           var writeHeader = ((input && input.file_path) || '') + '\n---\n';
           var writeContent = (input && input.content) || '';
           var writeId = 'vwt-' + tuid;
-          highlightedInput = esc(writeHeader) + truncateWithExpand(writeContent, 3000, writeId);
+          highlightedInput = esc(writeHeader) + truncateWithExpand(writeContent, MAX_TOOL_INPUT, writeId);
         } else if (name === 'Write' && !search) {
           highlightedInput = lang ? highlightCode(inputStr, lang) : esc(inputStr);
         } else if (search) {
           highlightedInput = highlight(esc(inputStr), search);
         } else if (lang) {
-          var MAX_HL = 3000;
-          highlightedInput = inputStr.length > MAX_HL
-            ? truncateWithExpand(inputStr, MAX_HL, tuid + '-in')
+          highlightedInput = inputStr.length > MAX_TOOL_INPUT
+            ? truncateWithExpand(inputStr, MAX_TOOL_INPUT, tuid + '-in')
             : highlightCode(inputStr, lang);
         } else {
-          highlightedInput = esc(inputStr);
+          highlightedInput = inputStr.length > MAX_TOOL_INPUT
+            ? truncateWithExpand(inputStr, MAX_TOOL_INPUT, tuid + '-in')
+            : esc(inputStr);
         }
         var resultStr = result !== undefined
           ? (typeof result === 'string' ? result : JSON.stringify(result, null, 2))
@@ -603,6 +608,7 @@
   function exportHTML() {
     var conv = document.getElementById('vwr-conv');
     if (!conv) return;
+    // App-authored CSS from our own stylesheets, not user/session data — safe to inline as-is.
     var css = Array.from(document.styleSheets).map(function (s) {
       try { return Array.from(s.cssRules).map(function (r) { return r.cssText; }).join('\n'); } catch (e) { return ''; }
     }).join('\n');
@@ -610,6 +616,7 @@
     var blob = new Blob([html], { type: 'text/html' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = 'session.html'; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
   }
 
   /* ------------------------------------------------------------------ */
