@@ -16,5 +16,5 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - run: npm ci
-      - run: node --test "test/cli/**/*.test.js"
+      - run: node --test test/cli/*.test.js
         shell: bash
