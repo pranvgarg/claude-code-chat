@@ -1,216 +1,179 @@
 # Claude Code Explorer
 
-A local, offline explorer for your `~/.claude` folder — browse sessions, usage, plans, skills, commands, hooks, and memory. All data reading and parsing happens client-side via the File System Access API; there is no server-side parsing.
+[![License: MIT](https://img.shields.io/github/license/pranvgarg/claude-code-chat?style=flat-square)](LICENSE)
+[![Node.js 18+](https://img.shields.io/badge/node.js-18%2B-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
 
-## Quick Start
+## See your Claude Code history clearly
 
-**Option A — `npx` (recommended):**
+Claude Code Explorer is a local dashboard for the data Claude Code already stores in `~/.claude`.
+
+Browse sessions, search transcripts, review token usage, inspect plans and skills, and understand your project history from one focused workspace.
+
+Your files stay on your machine. CCE runs as a local static app and reads your selected folder in the browser.
+
+## Start in one command
 
 ```bash
 npx harness-explorer
 ```
 
-This runs a local static file server in the foreground, opens your browser, and keeps serving until you press Ctrl+C in that terminal. (From a checkout: `node bin/cce.js`.) There are no background `start`, `stop`, or `status` commands; the terminal process owns the server lifecycle. CCE uses a stable port (`61489`) because the browser's folder permission (granted via the File System Access API) is tied to the origin (scheme + host + port). If that port is already in use, stop the existing CCE terminal with Ctrl+C before starting another one. Set `CCE_PORT` only when you intentionally need a different, separately-permissioned origin. Use `cce --help` for usage and `cce --version` for the installed version (all installed alongside the `cce` binary).
+CCE opens your browser and keeps the server attached to the terminal. Press `Ctrl+C` to stop it.
 
-Full-text search (the global search box) needs the app to be served over `http://localhost` — Web Workers, which build the search index off the main thread, are unavailable on `file://`. Opening `index.html` directly still works; the app detects the missing Worker and falls back to building the index on the main thread, which is slower for large session histories.
+For a checkout, run:
 
-**Option B — open the file directly:**
-
-1. Double-click `index.html` (or `open index.html` from Terminal)
-2. Click **"Choose ~/.claude folder"** and select your `~/.claude` directory
-3. Browse sessions in List, Grid, or Tiles view
-
-Either way, Chrome and Edge remember your folder selection via the File System Access API — future visits skip the picker. Safari and Firefox will re-prompt each time (browser limitation).
-
-## On-Disk Layout
-
-Claude Code stores sessions as `.jsonl` files directly inside each project subfolder:
-
+```bash
+node bin/cce.js
 ```
+
+Then choose `~/.claude` in the browser.
+
+CCE uses `http://localhost:61489` by default. The stable origin lets Chrome and Edge remember your folder permission between launches. If the port is in use, stop the existing CCE terminal with `Ctrl+C` before starting another one.
+
+## Why use CCE?
+
+Claude Code creates useful history, but its raw JSONL files are difficult to browse. CCE turns that history into a workspace for daily review:
+
+- Find an old decision without opening files one by one.
+- Compare model use, token counts, and estimated cost.
+- Return to recently opened sessions.
+- Inspect plans, skills, commands, hooks, and memory in context.
+- Keep your data local without setting up a database or hosted service.
+
+## What you can do
+
+| Area | Use it to |
+| --- | --- |
+| Sessions | Browse sessions in List, Grid, or Tiles view. Filter by project, model, branch, date, or favorite. |
+| Viewer | Read rendered Markdown, code, tool calls, thinking blocks, snapshots, token usage, and estimated cost. |
+| Search | Search titles, transcripts, thinking blocks, and tool calls. Jump from a result to the matching turn. |
+| Usage | Review estimated cost, sessions, tokens, project totals, activity, and the most expensive sessions. |
+| Plans | Read Markdown plans stored in `~/.claude/plans`. |
+| Skills | Browse local skills and their Markdown instructions. |
+| Commands | Inspect local slash commands and plugin commands. |
+| Hooks | Review configured hook events, matchers, commands, and local hook scripts. |
+| Memory | Read global memory and project memory files with resizable list panes. |
+
+## Designed for a local workflow
+
+- No database.
+- No build step.
+- No server-side parsing.
+- No analytics.
+- No file upload.
+- Vendored browser libraries with no CDN dependency at runtime.
+- Dark and light themes.
+- Resizable sidebars and document panes.
+- Keyboard-friendly controls with visible focus states.
+- Reduced-motion support.
+
+## How it works
+
+1. Start CCE from your terminal.
+2. Open the local URL.
+3. Choose your `~/.claude` folder.
+4. CCE reads and parses the files in your browser.
+5. Use the sidebar to browse sessions and supporting Claude Code context.
+
+The File System Access API stores the selected folder handle in IndexedDB when the browser supports it. Chrome and Edge can restore the handle. If the browser asks for permission again, click the reconnect button once.
+
+## Browser support
+
+| Browser | Folder permission | Notes |
+| --- | --- | --- |
+| Chrome 86+ | Can persist | Full File System Access API support. |
+| Edge 86+ | Can persist | Full File System Access API support. |
+| Safari 15.2+ | Re-pick required | Partial File System Access API support. |
+| Firefox | Re-pick required | The folder picker works, but File System Access API support is limited. |
+
+Use the local server for full-text search. Web Workers do not run from `file://`, so opening `index.html` directly uses a slower main-thread fallback for search indexing.
+
+## Claude Code data layout
+
+Claude Code stores sessions as JSONL files directly inside each project folder:
+
+```text
 ~/.claude/
-  projects/
-    -Users-yourname-Developer-my-project/     # one folder per project
-      abc123-def4-5678-abcd-ef1234567890.jsonl  # one .jsonl file per session
-      bcd456-ef12-3456-bcde-f12345678901.jsonl
-    -Users-yourname-another-project/
-      ...
-  settings.json
-  CLAUDE.md
+├── projects/
+│   ├── -Users-yourname-Developer-my-project/
+│   │   ├── abc123.jsonl
+│   │   └── def456.jsonl
+│   └── -Users-yourname-Developer-another-project/
+├── settings.json
+└── CLAUDE.md
 ```
 
-The folder name is the absolute path of your project with slashes replaced by dashes. Sessions live **directly** in the project folder — there is no `chat/` subfolder.
+CCE also reads plans, skills, commands, hooks, and memory files from the selected Claude directory.
 
-## Features
+## Privacy and permissions
 
-### Connect screen
+CCE reads files only after you choose a folder. The browser grants CCE read access to that folder. CCE does not send the files to a server because the app does not provide a data upload path.
 
-The first-run experience is an aurora-lit card over a faint grid backdrop. Animated color blobs drift slowly behind the card (gated by `prefers-reduced-motion`), and the card itself has a subtle gradient border. All existing copy and CTAs (folder picker, single-file picker, privacy note, browser note) are preserved.
+The local static server serves only the application files. It does not read or parse your Claude Code data.
 
-### Session Browser
+## Preferences and persistence
 
-Three views for browsing sessions — switch with the List / Grid / Tiles toggle in the header:
+CCE stores these preferences in the browser:
 
-| View | Description |
-|---|---|
-| **List** (default) | Compact rows with date, model, turn count, cost |
-| **Grid** | Cards with a soft top-gradient strip + session summary excerpt |
-| **Tiles** | Dense tile layout for high-volume browsing |
+| Preference | Stored |
+| --- | --- |
+| Favorite sessions | Yes |
+| Theme | Yes |
+| Session view | Yes |
+| Sidebar and pane widths | Yes |
+| Folder handle | Chrome and Edge only |
 
-- **Star sessions** — Click the star to favorite a session; favorites persist across browser restarts
-- **Filters** — Project, model, git branch, date range (7/30/90 days or all time), and starred-only, combinable
-- **Sort** — By date (recent), cost, turn count, or project (alphabetical, then recent within each project)
-- **Recently opened** — A strip of your last few opened sessions for quick return
-- **Global search** — See "Search" below for the full-text search box in the toolbar
-- **What's remembered** — View mode (List/Grid/Tiles) and grouping (By project) are saved and restored on your next visit; filters (project, model, branch, date range, starred) reset to "all" each time you open Sessions
+Use Preferences in the sidebar to export or import your UI preferences as JSON.
 
-### Search
+## Development
 
-The search box in the toolbar searches across your whole `~/.claude` folder, not just the current view:
+Clone the repository and start the local app:
 
-- **What it searches** — Session titles, full transcripts (user messages, assistant responses, thinking blocks), and tool calls
-- **Scope toggle** — Narrow to Titles, Full text, or Tool calls only
-- **Results grouped by session** — Each matching session shows its top snippets inline; click a snippet to jump straight to that exact turn in the viewer, or "Show N more" to see every match in that session
-- **Indexing** — The index is built in a Web Worker (off the main thread) and cached in IndexedDB, keyed by file size + modified time, so unchanged sessions are never re-indexed on subsequent visits
-
-### Session Viewer
-
-Click any session to open it as a rendered conversation:
-
-- **Markdown rendering** — Assistant responses rendered with headings, bold, code blocks, tables (via vendored marked.js)
-- **Syntax highlighting** — Code blocks and tool inputs colored for 15+ languages (via vendored Prism.js)
-- **Copy button on every code block** — One-click copy with a "Copied" confirmation; language label shown in the code header row
-- **Thinking blocks** — Click to expand Claude's internal reasoning chain
-- **Tool calls** — Expand to see input and result; long outputs have a "Show full" toggle
-- **Token usage** — Input / output / cache counts per assistant turn
-- **Cost per turn** — Estimated cost shown on each assistant message
-- **DOMPurify sanitization** — All HTML content sanitized before render (vendored)
-- **Scroll-to-bottom FAB** — Appears after scrolling up >200px; smooth-scrolls back to the latest turn
-- **Scroll-progress bar** — A 2px gradient bar at the top of the viewer tracks reading position
-- **View mode persists, filters reset per session** — Role filters (User/Assistant/System/Progress/Snapshots) and the TOC sidebar's open/closed state carry over as you move between sessions in the viewer; the search box itself resets to empty each time you open a session
-
-### Usage Dashboard
-
-The **Usage** tab shows aggregated statistics across all sessions in the picked folder:
-
-- **4 stat cards** — Each with a gradient header band in its role color (cost / sessions / tokens / projects)
-- **Cost by project** — Gradient-filled bars; tooltips show exact spend
-- **7-day sparkline** — Inline SVG trend above the 14-day activity chart
-- **14-day activity** — Sessions per day, gradient bars with hover tooltips
-- **Most expensive sessions** — Top 6 by estimated cost, clickable into the viewer
-- **Total spend by project**
-- **Token usage over time**
-- **Model breakdown** (if multiple models used)
-- **Session count and average cost**
-
-### Hooks
-
-The **Hooks** tab shows the hooks configured across your `settings.json` files:
-
-- **Per-event sidebar** — Hooks grouped by lifecycle event (PreToolUse, PostToolUse, Notification, etc.); pick an event to see the matchers and commands registered for it
-- **Inline script preview** — Hook commands that point at a local script under `~/.claude/hooks` show the script's contents inline, so you don't have to open a terminal to see what a hook actually runs
-- **User-level hooks only** — Reads your global `~/.claude/settings.json`; a note flags that a repository's own project-level `.claude/settings.json` hooks aren't shown here
-
-## Persistence
-
-Preferences are saved to `localStorage` keyed by session UUID:
-
-| What | Stored |
-|---|---|
-| Starred / favorite sessions | Yes (per UUID) |
-| Last selected view (List/Grid/Tiles) | Yes |
-| Theme (light/dark) | Yes |
-| Folder handle | Chrome/Edge only (File System Access API) |
-
-**Export / Import prefs** — Use the settings panel to export your favorites and preferences as JSON, or import a backup. Useful when switching browsers or machines.
-
-**Safari caveat** — Safari does not persist the folder handle; you must re-pick `~/.claude` on each visit. All other prefs (stars, theme, view) persist normally via localStorage.
-
-## Offline Behavior
-
-All libraries are vendored locally under `assets/vendor/` — no CDN calls, no network required:
-
-- `marked.min.js` — Markdown rendering
-- `purify.min.js` — HTML sanitization
-- `fuse.min.js` — Fuzzy search
-- `prism.min.js` + `prism.css` — Syntax highlighting
-
-The app works fully offline after first open. You can even copy the whole folder to a USB drive.
-
-## Visual System & CSS Architecture
-
-The stylesheet is layered — a shared design-system layer plus per-view scoped files:
-
-```
-assets/css/
-  tokens.css              Design tokens (colors, type scale, spacing, radii,
-                          shadows, motion). Dark + light themes.
-  shell.css               App frame: sidebar, nav, toolbar, content scroll.
-                          Active accent bar, hover gradient, focus-visible,
-                          aria-current style, collapsed-mode tooltips.
-  views/
-    connect.css           Connect screen (aurora, gradient-border card, pills)
-    cards.css             Shared primitives: .card, .view-list, .tile,
-                          .skeleton, .empty, .badge-*, .chip-branch
-    viewer.css            Conversation viewer (.vwr-*): bubbles, code blocks
-                          (copy button + lang label), thinking/tool blocks,
-                          scroll-progress bar, scroll-to-bottom FAB
-    dashboard.css         Usage dashboard (.dash-*): stat cards with
-                          gradient header bands, project bars, sparkline,
-                          activity chart, expensive-sessions table
-    docs.css              Plans & Skills (.doc-*): list + markdown body
+```bash
+git clone https://github.com/pranvgarg/claude-code-chat.git
+cd claude-code-chat
+node bin/cce.js
 ```
 
-**Conventions:**
-- View-specific classes are prefix-scoped (`vwr-`, `dash-`, `doc-`) so they don't collide across views.
-- Shared primitives (`.empty`, `.skeleton`, `.card`, `.star`, `.cost`) live in `cards.css` and are the design-system layer used by every view.
-- All animations are gated by `@media (prefers-reduced-motion: no-preference)`. Users with reduced motion enabled see static final states — shimmer, hover lifts, aurora drift, and view fade-in all stop automatically.
-- `--font-display` repointed to a refined system sans stack (was Georgia serif). No webfonts are loaded; `--font-mono` and `--font-ui` remain system stacks.
+Run the test suite:
 
-## Browser Support
+```bash
+npm test
+```
 
-| Browser | Folder memory | Notes |
-|---|---|---|
-| Chrome 86+ | Persists | Full File System Access API support |
-| Edge 86+ | Persists | Full File System Access API support |
-| Safari 15.2+ | Re-pick each time | Partial FSA support; no handle persistence |
-| Firefox | Re-pick each time | FSA not supported; picker works each time |
+The project has no frontend build step. Edit the files under `assets/`, reload the browser, and test again.
 
-## Legacy Viewer
+## CLI reference
 
-`index-legacy-viewer.html` is the previous single-file viewer (loads one `.jsonl` at a time via drag-and-drop or file picker). It still works if you want a quick look at a single file without picking the whole `~/.claude` folder.
+```text
+cce                 Start the local server in the foreground
+cce --help          Show usage
+cce --version       Show the installed version
+```
 
-`index-legacy-viewer.html` and `claude-conversation.schema.json` are kept in the repository for reference only; they are not part of the `npx harness-explorer` package.
+Use `Ctrl+C` to stop the server. CCE has no background `start`, `stop`, or `status` commands.
+
+## Project structure
+
+```text
+bin/cce.js                 Local foreground launcher
+lib/static-server.js       Safe static file server
+assets/js/core/             File access, parsing, search, cost, and storage
+assets/js/views/            Sessions, viewer, usage, docs, hooks, and memory
+assets/css/                 Tokens, shell, and view styles
+assets/vendor/              Offline browser libraries
+test/                       Node test suite
+```
 
 ## Roadmap
 
-**Phase 1 (current):** Sessions, Viewer, Usage, Plans, Skills, Commands, Hooks, and Memory — all working offline from a picked `~/.claude`, and all read/parsed client-side (no server-side parsing).
+- Adapters for other coding-agent session formats.
+- A command palette for fast navigation.
+- Multi-root browsing for project-level `CLAUDE.md` files.
 
-**Shipped:** the `npx harness-explorer` / `cce` CLI (see Quick Start above) — a static file server with no dependencies beyond `open`, that only serves the app's own files. It still relies on the File System Access API in the browser to read `~/.claude`; it does not read or parse your data on the server side.
+## Contributing
 
-**Future work:** adapters for other coding-agent session formats (Codex, Gemini, etc.), a command palette, and multi-root folder support for browsing a project's own `CLAUDE.md` alongside its auto-memory notes.
+Issues and pull requests are welcome. Please include the browser, operating system, CCE command, and a short reproduction when reporting a problem.
 
-## Schema Reference
+## License
 
-The `claude-conversation.schema.json` file in this repo documents every JSONL entry type:
-
-| Entry Type | Description |
-|---|---|
-| `user` | User messages and tool results |
-| `assistant` | Assistant responses (text, thinking blocks, tool calls) |
-| `system` | System events (turn duration, etc.) |
-| `progress` | Streaming progress events (bash commands, hooks) |
-| `file-history-snapshot` | File backup snapshots taken during the session |
-| `last-prompt` | The last user prompt for session resumption |
-
-## Quick Reference
-
-```bash
-# Where are your Claude Code sessions?
-ls ~/.claude/projects/
-
-# List sessions for a specific project (they're .jsonl files directly in the folder)
-ls -lt ~/.claude/projects/-Users-$(whoami)-Developer-my-project/
-
-# Open the Explorer
-open index.html
-```
+MIT. See [LICENSE](LICENSE).
