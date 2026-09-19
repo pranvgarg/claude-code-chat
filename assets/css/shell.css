@@ -98,7 +98,7 @@ button.nav-item:focus-visible { outline:2px solid var(--accent); outline-offset:
   background: color-mix(in srgb, var(--surface) 55%, transparent);
   backdrop-filter: blur(6px);
 }
-.toolbar-actions { display:flex; align-items:center; gap:12px; flex:1; min-width:0; }
+.toolbar-actions { display:flex; align-items:center; justify-content:flex-end; gap:12px; flex:1 1 auto; min-width:0; flex-wrap:wrap; }
 .search-kbd { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); border:1px solid var(--border); border-radius: var(--r-xs); padding:1px 6px; }
 .search {
   flex:1; min-width:200px; max-width:420px;
@@ -143,6 +143,18 @@ button.nav-item:focus-visible { outline:2px solid var(--accent); outline-offset:
 .content-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; }
 .content-head .eyebrow { font-size:var(--fs-xs); letter-spacing:.14em; text-transform:uppercase; color:var(--text-faint); }
 .content-head .total { font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--text-dim); }
+.sessions-filter-row {
+  display:flex; align-items:center; flex-wrap:wrap; gap:8px;
+  margin: -2px 0 16px; padding:10px 0;
+  border-top:1px solid var(--border-soft); border-bottom:1px solid var(--border-soft);
+}
+.sessions-filter-row .tbtn { min-width:0; max-width:100%; }
+.sessions-filter-row select.tbtn { text-overflow:ellipsis; }
+
+@media (max-width: 760px) {
+  .sessions-filter-row .tbtn,
+  .sessions-filter-row select.tbtn { flex:1 1 140px; }
+}
 
 /* ---- View fade-in on mount (reused from connect card keyframe) ---- */
 @keyframes cce-view-in {

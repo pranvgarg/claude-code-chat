@@ -298,22 +298,20 @@
       '<rect x="10.5" y="11" width="6" height="6" rx="1"/>' +
       '<rect x="18" y="11" width="3" height="6" rx="1"/>' +
       '</svg>Tiles</button>' +
-      '</div>' +
+      '</div>';
+  }
 
-      '<button class="tbtn" id="cce-sort-btn">' +
+  function filterHTML() {
+    return '<button class="tbtn" id="cce-sort-btn">' +
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
       '<path d="M3 6h18M7 12h10M11 18h2"/>' +
       '</svg>Sort <span class="muted" id="cce-sort-label">Recent</span>' +
       '</button>' +
-
-      '<div class="spacer"></div>' +
-
       '<button class="tbtn" id="cce-group-btn">' +
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
       '<path d="M3 7h18M3 12h18M3 17h18"/>' +
       '</svg><span id="cce-group-label">Recent</span>' +
       '</button>' +
-
       '<select class="tbtn" id="cce-f-project" aria-label="Filter by project"><option value="">All projects</option></select>' +
       '<select class="tbtn" id="cce-f-model" aria-label="Filter by model"><option value="">Any model</option><option value="opus">Opus</option><option value="sonnet">Sonnet</option><option value="haiku">Haiku</option><option value="fable">Fable</option></select>' +
       '<select class="tbtn" id="cce-f-branch" aria-label="Filter by branch"><option value="">Any branch</option></select>' +
@@ -344,10 +342,12 @@
         '<span class="eyebrow" id="cce-eyebrow">All sessions</span>' +
         '<span class="total" id="cce-total"></span>' +
         '</div>' +
+        '<div class="sessions-filter-row" id="cce-filters">' + filterHTML() + '</div>' +
         '<div id="cce-stage"></div>';
 
       /* Resolve toolbar element references (may be in shellToolbar or root) */
-      var ctxEl   = shellToolbar || root;
+      var toolbarCtx = shellToolbar || root;
+      var filterCtx = root.querySelector('#cce-filters') || toolbarCtx;
       var stage    = root.querySelector('#cce-stage');
       var totalEl  = root.querySelector('#cce-total');
       var eyebrowEl = root.querySelector('#cce-eyebrow');
@@ -361,23 +361,23 @@
       state.filters = { project: '', model: '', branch: '', days: 0, starred: false };
 
       /* Update seg toggle buttons */
-      ctxEl.querySelectorAll('#cce-seg button').forEach(function (b) {
+      toolbarCtx.querySelectorAll('#cce-seg button').forEach(function (b) {
         b.classList.toggle('on', b.dataset.view === state.view);
       });
 
       /* Update group label to reflect current state */
-      var groupLabel = ctxEl.querySelector('#cce-group-label');
+      var groupLabel = filterCtx.querySelector('#cce-group-label');
       if (groupLabel) groupLabel.textContent = state.group;
 
       /* -------------------------------------------------------------- */
       /* 3. Wire controls                                                 */
       /* -------------------------------------------------------------- */
       /* View toggle */
-      var segEl = ctxEl.querySelector('#cce-seg');
+      var segEl = toolbarCtx.querySelector('#cce-seg');
       if (segEl) segEl.addEventListener('click', function (e) {
         var btn = e.target.closest('button');
         if (!btn) return;
-        ctxEl.querySelectorAll('#cce-seg button').forEach(function (b) { b.classList.remove('on'); });
+        toolbarCtx.querySelectorAll('#cce-seg button').forEach(function (b) { b.classList.remove('on'); });
         btn.classList.add('on');
         state.view = btn.dataset.view;
         CCE.store.set('view', state.view);
@@ -385,19 +385,19 @@
       });
 
       /* Sort cycle: Recent → Cost → Messages → Project → Recent */
-      var sortBtn = ctxEl.querySelector('#cce-sort-btn');
+      var sortBtn = filterCtx.querySelector('#cce-sort-btn');
       if (sortBtn) sortBtn.addEventListener('click', function () {
         state.sort = state.sort === 'Recent' ? 'Cost' : state.sort === 'Cost' ? 'Messages' : state.sort === 'Messages' ? 'Project' : 'Recent';
-        var lbl = ctxEl.querySelector('#cce-sort-label');
+        var lbl = filterCtx.querySelector('#cce-sort-label');
         if (lbl) lbl.textContent = state.sort;
         if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
       });
 
       /* Group toggle: Recent ↔ By project */
-      var groupBtn = ctxEl.querySelector('#cce-group-btn');
+      var groupBtn = filterCtx.querySelector('#cce-group-btn');
       if (groupBtn) groupBtn.addEventListener('click', function () {
         state.group = state.group === 'Recent' ? 'By project' : 'Recent';
-        var lbl = ctxEl.querySelector('#cce-group-label');
+        var lbl = filterCtx.querySelector('#cce-group-label');
         if (lbl) lbl.textContent = state.group;
         CCE.store.set('group', state.group);
         if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
@@ -407,18 +407,18 @@
       function populateFilterOptions(summaries) {
         var projects = {}, branches = {};
         summaries.forEach(function (s) { projects[s.projectFolder] = s.displayPath; if (s.branch) branches[s.branch] = 1; });
-        var pSel = ctxEl.querySelector('#cce-f-project'), bSel = ctxEl.querySelector('#cce-f-branch');
+        var pSel = filterCtx.querySelector('#cce-f-project'), bSel = filterCtx.querySelector('#cce-f-branch');
         if (pSel) Object.keys(projects).sort().forEach(function (k) { var o = document.createElement('option'); o.value = k; o.textContent = projects[k]; pSel.appendChild(o); });
         if (bSel) Object.keys(branches).sort().forEach(function (b) { var o = document.createElement('option'); o.value = b; o.textContent = b; bSel.appendChild(o); });
       }
       ['project', 'model', 'branch', 'days'].forEach(function (name) {
-        var el = ctxEl.querySelector('#cce-f-' + name);
+        var el = filterCtx.querySelector('#cce-f-' + name);
         if (el) el.addEventListener('change', function () {
           state.filters[name] = name === 'days' ? Number(el.value) : el.value;
           if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
         });
       });
-      var starBtn = ctxEl.querySelector('#cce-f-starred');
+      var starBtn = filterCtx.querySelector('#cce-f-starred');
       if (starBtn) starBtn.addEventListener('click', function () {
         state.filters.starred = !state.filters.starred;
         starBtn.setAttribute('aria-pressed', String(state.filters.starred));
