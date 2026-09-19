@@ -129,6 +129,7 @@
     var avgPerProject = data.activeProjects > 0
       ? (data.totalCost / data.activeProjects)
       : 0;
+    var range = dateHintFor(state.days).toLowerCase();
 
     return '<div class="dash-stat-cards">' +
 
@@ -140,7 +141,7 @@
             'Total Est. Cost' +
           '</div>' +
           '<div class="dash-stat-value">' + esc(fmtCost(data.totalCost)) + '</div>' +
-          '<div class="dash-stat-sub">across all sessions</div>' +
+          '<div class="dash-stat-sub">' + esc(range) + '</div>' +
         '</div>' +
       '</div>' +
 
@@ -152,7 +153,7 @@
             'Total Sessions' +
           '</div>' +
           '<div class="dash-stat-value">' + esc(String(data.totalSessions)) + '</div>' +
-          '<div class="dash-stat-sub">across <strong>' + esc(String(data.activeProjects)) + '</strong> projects</div>' +
+          '<div class="dash-stat-sub">' + esc(range) + ' · <strong>' + esc(String(data.activeProjects)) + '</strong> projects</div>' +
         '</div>' +
       '</div>' +
 
@@ -164,7 +165,7 @@
             'Total Tokens' +
           '</div>' +
           '<div class="dash-stat-value">' + esc(fmtTokens(data.totalTokens)) + '</div>' +
-          '<div class="dash-stat-sub">estimated usage</div>' +
+          '<div class="dash-stat-sub">' + esc(range) + '</div>' +
         '</div>' +
       '</div>' +
 
@@ -176,7 +177,7 @@
             'Active Projects' +
           '</div>' +
           '<div class="dash-stat-value">' + esc(String(data.activeProjects)) + '</div>' +
-          '<div class="dash-stat-sub">avg <strong>' + esc(fmtCost(avgPerProject)) + '</strong> / project</div>' +
+          '<div class="dash-stat-sub">' + esc(range) + ' · avg <strong>' + esc(fmtCost(avgPerProject)) + '</strong> / project</div>' +
         '</div>' +
       '</div>' +
 
@@ -332,8 +333,8 @@
         /* 14-day activity */
         '<div class="dash-section">' +
           '<div class="dash-section-header">' +
-            '<span class="dash-section-title">Activity — last 14 days</span>' +
-            '<span class="dash-section-sub">sessions per day</span>' +
+            '<span class="dash-section-title">Activity</span>' +
+            '<span class="dash-section-sub">' + esc(dateHintFor(state.days)) + ' · sessions per day</span>' +
           '</div>' +
           '<div class="dash-act-wrap">' +
             renderSparkline(data.days14, data.dayCounts) +
@@ -347,7 +348,7 @@
         '<div class="dash-section">' +
           '<div class="dash-section-header">' +
             '<span class="dash-section-title">Most expensive sessions</span>' +
-            '<span class="dash-section-sub">Top ' + Math.min(data.top6.length, 6) + ' by estimated cost</span>' +
+            '<span class="dash-section-sub">' + (data.top6.length ? 'Top ' + Math.min(data.top6.length, 6) + ' by estimated cost' : 'No sessions in this range') + '</span>' +
           '</div>' +
           renderExpensiveTable(data.top6) +
         '</div>' +
@@ -398,8 +399,8 @@
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">' +
           '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>' +
           '</svg>' +
-          '<h3>No sessions found</h3>' +
-          '<p>Connect to a folder with Claude sessions to see usage.</p>' +
+          '<h3>' + (state.days ? 'No sessions in this range' : 'No sessions found') + '</h3>' +
+          '<p>' + (state.days ? 'Try a wider date range to see usage.' : 'Connect to a folder with Claude sessions to see usage.') + '</p>' +
         '</div>' +
       '</div>';
   }

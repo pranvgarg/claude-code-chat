@@ -68,8 +68,11 @@
     mount: function (root) {
       var tb = document.getElementById('toolbar-actions');
       if (tb) tb.innerHTML = '<span class="doc-title">Hooks</span><div class="spacer"></div>';
-      root.innerHTML = '<div class="doc-view"><aside class="doc-list" id="doc-list"></aside><div class="doc-body" id="doc-body"></div></div>';
+      root.innerHTML = '<div class="doc-view"><aside class="doc-list" id="doc-list"></aside><div class="doc-resizer" id="hooks-resizer" role="separator" aria-label="Resize hooks list" tabindex="0"></div><div class="doc-body" id="doc-body"></div></div>';
       var listEl = root.querySelector('#doc-list'), bodyEl = root.querySelector('#doc-body');
+      if (CCE.app.initResizable) {
+        CCE.app.initResizable(root.querySelector('#hooks-resizer'), listEl, { min: 220, max: 460, key: 'hooks-list-width' });
+      }
       CCE.fsaccess.readSettings().then(function (settings) {
         if (!settings) { bodyEl.innerHTML = '<div class="doc-empty"><h3>No settings found</h3><p>~/.claude/settings.json is not readable.</p></div>'; return; }
         var events = flatten(settings.hooks);

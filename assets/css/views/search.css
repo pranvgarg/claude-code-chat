@@ -16,6 +16,7 @@
 .srch-row-body { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .srch-role { font-size: var(--fs-xs); font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
 .srch-snippet { font-size: var(--fs-md); line-height: var(--lh-base); color: var(--text-dim); word-break: break-word; }
+.srch-snippet-code { font-family: var(--font-mono); font-size: var(--fs-sm); line-height: 1.55; }
 .srch-snippet mark { background: color-mix(in srgb, var(--c-cost) 28%, transparent); color: var(--text); font-weight:600; border-radius:3px; padding:0 2px; }
 .srch-more, .srch-loading { display:block; text-align:center; padding:9px; font-size: var(--fs-sm); color: var(--accent); text-decoration:none; border-top:1px solid var(--border-soft); }
 .srch-loading { color: var(--text-faint); }

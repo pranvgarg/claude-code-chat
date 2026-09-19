@@ -6,7 +6,8 @@
    ============================================================ */
 
 /* ---- App shell ---- */
-.app { display:grid; grid-template-columns: 240px 1fr; height:100vh; }
+.app { --sidebar-width: 240px; display:grid; grid-template-columns: var(--sidebar-width) 6px minmax(0, 1fr); height:100vh; }
+.app.sidebar-collapsed { grid-template-columns: 62px 6px minmax(0, 1fr); }
 
 /* ---- Sidebar ---- */
 .sidebar {
@@ -20,7 +21,11 @@
   border-bottom: 1px solid var(--border-soft);
   display:flex; flex-direction:column; gap:10px;
 }
-.brand-row { display:flex; align-items:center; gap:11px; }
+.brand-row { display:flex; align-items:center; gap:11px; min-width:0; }
+.sidebar-toggle { margin-left:auto; width:28px; height:28px; display:grid; place-items:center; border:1px solid var(--border); border-radius:var(--r-sm); background:var(--bg); color:var(--text-faint); cursor:pointer; }
+.sidebar-toggle:hover { color:var(--text); border-color:var(--accent); }
+.sidebar-toggle svg { width:15px; height:15px; transition:transform var(--motion-fast); }
+.sidebar-collapsed .sidebar-toggle svg { transform:rotate(180deg); }
 .brand-mark {
   width:32px; height:32px; border-radius:9px;
   background: var(--grad-brand);
@@ -87,18 +92,26 @@ button.nav-item:focus-visible { outline:2px solid var(--accent); outline-offset:
   border-color: color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
-.sidebar-foot { border-top:1px solid var(--border-soft); padding:10px; display:flex; flex-direction:column; gap:2px; }
+.sidebar-foot { position:relative; border-top:1px solid var(--border-soft); padding:10px; display:flex; flex-direction:column; gap:2px; }
+.prefs-caret { margin-left:auto; color:var(--text-faint); }
+.prefs-menu { position:absolute; left:calc(100% - 4px); bottom:10px; width:210px; padding:5px; background:var(--elevated); border:1px solid var(--border); border-radius:var(--r-md); box-shadow:var(--shadow-md); z-index:20; }
+.prefs-menu button { width:100%; display:flex; align-items:center; gap:8px; padding:8px 10px; border:0; background:transparent; color:var(--text-dim); border-radius:var(--r-xs); font:inherit; font-size:var(--fs-sm); text-align:left; cursor:pointer; }
+.prefs-menu button:hover { background:var(--surface-2); color:var(--text); }
+.prefs-menu button span { width:16px; color:var(--accent); text-align:center; }
+.sidebar-resizer { cursor:col-resize; position:relative; background:transparent; }
+.sidebar-resizer::after { content:""; position:absolute; top:0; bottom:0; left:2px; width:2px; background:transparent; transition:background var(--motion-fast); }
+.sidebar-resizer:hover::after, .is-resizing .sidebar-resizer::after { background:var(--accent); }
 
 /* ---- Main pane ---- */
 .main { display:flex; flex-direction:column; min-width:0; min-height:0; background:var(--bg); }
 
 .toolbar {
   padding: 14px 22px; border-bottom:1px solid var(--border-soft);
-  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  display:flex; align-items:center; gap:12px; flex-wrap:nowrap; min-height:64px;
   background: color-mix(in srgb, var(--surface) 55%, transparent);
   backdrop-filter: blur(6px);
 }
-.toolbar-actions { display:flex; align-items:center; justify-content:flex-end; gap:12px; flex:1 1 auto; min-width:0; flex-wrap:wrap; }
+.toolbar-actions { display:flex; align-items:center; justify-content:flex-end; gap:10px; flex:1 1 auto; min-width:0; overflow:hidden; }
 .search-kbd { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); border:1px solid var(--border); border-radius: var(--r-xs); padding:1px 6px; }
 .search {
   flex:1; min-width:200px; max-width:420px;
@@ -171,8 +184,8 @@ button.nav-item:focus-visible { outline:2px solid var(--accent); outline-offset:
 }
 
 @media (max-width: 880px) {
-  .app { grid-template-columns: 62px 1fr; }
-  .brand-name, .brand-path, .nav-label, .nav-item span, .nav-item .count, .sidebar-foot span { display:none; }
+  .app, .app.sidebar-collapsed { grid-template-columns: 62px 6px minmax(0, 1fr); }
+  .brand-name, .brand-path, .nav-label, .nav-item span, .nav-item .count, .sidebar-foot span, .sidebar-toggle { display:none; }
   .nav-item { justify-content:center; }
   /* Tooltip for icon-only collapsed mode */
   .nav-item { position: relative; }
@@ -188,4 +201,12 @@ button.nav-item:focus-visible { outline:2px solid var(--accent); outline-offset:
     box-shadow: var(--shadow-md);
   }
   .nav-item:hover::after { opacity: 1; }
+}
+
+@media (max-width: 760px) {
+  .toolbar { padding:10px 14px; }
+  .toolbar-actions { gap:6px; }
+  .search { min-width:0; max-width:none; }
+  .content { padding:16px 14px 32px; }
+  .prefs-menu { left:8px; bottom:56px; }
 }

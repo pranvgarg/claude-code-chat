@@ -132,7 +132,7 @@
     search: '',
     searchIndex: 0,
     searchMatches: [],
-    sidebarOpen: false,
+    sidebarOpen: true,
     render: null,
     io: null
   };
@@ -708,36 +708,17 @@
       if (shellToolbar) {
         shellToolbar.innerHTML =
           '<button class="vwr-btn" id="vwr-back">&#8592; Sessions</button>' +
-          '<span class="vwr-session-id" id="vwr-session-label" title="' + esc(id) + '">' + esc(truncate(id, 40)) + '</span>' +
-          '<div class="vwr-filter-group" id="vwr-filters">' +
-            '<label class="vwr-filter-label"><input type="checkbox" data-filter="user" checked> User</label>' +
-            '<label class="vwr-filter-label"><input type="checkbox" data-filter="assistant" checked> Assistant</label>' +
-            '<label class="vwr-filter-label"><input type="checkbox" data-filter="system" checked> System</label>' +
-            '<label class="vwr-filter-label"><input type="checkbox" data-filter="progress"> Progress</label>' +
-            '<label class="vwr-filter-label"><input type="checkbox" data-filter="snapshot"> Snapshots</label>' +
-          '</div>' +
-          '<div class="vwr-search-row">' +
-            '<input type="text" id="vwr-search-box" class="vwr-search-input" placeholder="Search messages…">' +
-            '<span id="vwr-search-nav" style="display:none;align-items:center;gap:4px;">' +
-              '<span id="vwr-search-count" class="vwr-search-count-label"></span>' +
-              '<button class="vwr-btn" id="vwr-search-prev" title="Previous match">&#9650;</button>' +
-              '<button class="vwr-btn" id="vwr-search-next" title="Next match">&#9660;</button>' +
-            '</span>' +
-          '</div>' +
+          '<span class="vwr-session-id" id="vwr-session-label" title="' + esc(id) + '">Session / ' + esc(truncate(id, 40)) + '</span>' +
+          '<span class="vwr-toolbar-meta" id="vwr-toolbar-model">Model —</span>' +
+          '<span class="vwr-toolbar-meta" id="vwr-toolbar-turns">— turns</span>' +
+          '<span class="vwr-toolbar-cost" id="vwr-toolbar-cost">$0.00</span>' +
           '<div class="spacer"></div>' +
-          '<button class="vwr-btn" id="vwr-toc-btn">&#9776; TOC</button>' +
-          '<button class="vwr-btn" id="vwr-expand-all">Expand All</button>' +
-          '<button class="vwr-btn" id="vwr-collapse-all">Collapse All</button>' +
-          '<button class="vwr-btn" id="vwr-export-md">Export .md</button>' +
-          '<button class="vwr-btn" id="vwr-export-html">Export .html</button>';
+          '<button class="vwr-btn" id="vwr-rail-btn">Details</button>';
       }
 
       /* ---- 3. Build view structure ---- */
       root.innerHTML =
         '<div class="vwr-root">' +
-          '<aside class="vwr-sidebar" id="vwr-sidebar">' +
-            '<div class="vwr-sidebar-content" id="vwr-toc-content"></div>' +
-          '</aside>' +
           '<div class="vwr-main">' +
             '<div class="vwr-progress-track"><div class="vwr-progress-fill" id="vwr-progress-fill"></div></div>' +
             '<div class="vwr-session-meta" id="vwr-session-meta"></div>' +
@@ -749,11 +730,43 @@
               '</svg>' +
             '</button>' +
           '</div>' +
+          '<aside class="vwr-sidebar vwr-sidebar-open" id="vwr-sidebar">' +
+            '<div class="vwr-sidebar-content">' +
+              '<div class="vwr-rail-section vwr-rail-find"><div class="vwr-search-row">' +
+                '<input type="text" id="vwr-search-box" class="vwr-search-input" placeholder="Find in session…">' +
+                '<span id="vwr-search-nav" style="display:none;align-items:center;gap:4px;">' +
+                  '<span id="vwr-search-count" class="vwr-search-count-label"></span>' +
+                  '<button class="vwr-btn" id="vwr-search-prev" title="Previous match">&#9650;</button>' +
+                  '<button class="vwr-btn" id="vwr-search-next" title="Next match">&#9660;</button>' +
+                '</span>' +
+              '</div></div>' +
+              '<div class="vwr-rail-section"><div class="vwr-rail-label">Show</div>' +
+                '<div class="vwr-filter-group" id="vwr-filters">' +
+                  '<label class="vwr-filter-label"><input type="checkbox" data-filter="user" checked> User</label>' +
+                  '<label class="vwr-filter-label"><input type="checkbox" data-filter="assistant" checked> Assistant</label>' +
+                  '<label class="vwr-filter-label"><input type="checkbox" data-filter="progress"> Progress</label>' +
+                  '<label class="vwr-filter-label"><input type="checkbox" data-filter="snapshot"> Snapshots</label>' +
+                  '<label class="vwr-filter-label"><input type="checkbox" data-filter="system" checked> System</label>' +
+                '</div>' +
+              '</div>' +
+              '<div class="vwr-rail-section vwr-rail-stats"><div class="vwr-rail-label">This session</div><div id="vwr-sidebar-meta"></div></div>' +
+              '<div class="vwr-rail-section vwr-rail-outline"><div class="vwr-rail-label">Outline</div><div id="vwr-toc-content"></div></div>' +
+              '<div class="vwr-rail-actions">' +
+                '<button class="vwr-btn" id="vwr-toc-btn">Outline</button>' +
+                '<button class="vwr-btn" id="vwr-expand-all">Expand all</button>' +
+                '<button class="vwr-btn" id="vwr-collapse-all">Collapse</button>' +
+                '<button class="vwr-btn" id="vwr-export-md">Export .md</button>' +
+                '<button class="vwr-btn" id="vwr-export-html">Export .html</button>' +
+                '<button class="vwr-btn" id="vwr-star">☆ Star</button>' +
+              '</div>' +
+            '</div>' +
+          '</aside>' +
         '</div>';
 
       var conv = root.querySelector('#vwr-conv');
       var tocContent = root.querySelector('#vwr-toc-content');
       var metaEl = root.querySelector('#vwr-session-meta');
+      var sidebarMetaEl = root.querySelector('#vwr-sidebar-meta');
       var subagentsEl = root.querySelector('#vwr-subagents');
       var progressFill = root.querySelector('#vwr-progress-fill');
       var scrollFab = root.querySelector('#vwr-scroll-fab');
@@ -852,6 +865,25 @@
           sidebar.classList.toggle('vwr-sidebar-open', _state.sidebarOpen);
         });
       }
+      var railBtn = document.getElementById('vwr-rail-btn');
+      if (railBtn && sidebar) {
+        railBtn.addEventListener('click', function () {
+          _state.sidebarOpen = !_state.sidebarOpen;
+          sidebar.classList.toggle('vwr-sidebar-open', _state.sidebarOpen);
+        });
+      }
+      var starBtn = document.getElementById('vwr-star');
+      if (starBtn && CCE.store) {
+        var starred = CCE.store.isFavorite(id);
+        starBtn.textContent = starred ? '★ Starred' : '☆ Star';
+        starBtn.classList.toggle('on', starred);
+        starBtn.addEventListener('click', function () {
+          CCE.store.toggleFavorite(id);
+          var isOn = CCE.store.isFavorite(id);
+          starBtn.textContent = isOn ? '★ Starred' : '☆ Star';
+          starBtn.classList.toggle('on', isOn);
+        });
+      }
 
       var expandAllBtn = document.getElementById('vwr-expand-all');
       var collapseAllBtn = document.getElementById('vwr-collapse-all');
@@ -910,6 +942,16 @@
         mp.push('<span>' + entries.length + ' entries</span>');
         if (totalCost > 0) mp.push('<span>Est. cost: $' + totalCost.toFixed(2) + '</span>');
         if (metaEl) metaEl.innerHTML = mp.join('<span class="vwr-meta-sep">\xb7</span>');
+        var firstModelEntry = entries.find(function (e) { return e.message && e.message.model; });
+        var toolbarModel = document.getElementById('vwr-toolbar-model');
+        var toolbarTurns = document.getElementById('vwr-toolbar-turns');
+        var toolbarCost = document.getElementById('vwr-toolbar-cost');
+        if (toolbarModel) toolbarModel.textContent = 'Model ' + (firstModelEntry && firstModelEntry.message.model ? firstModelEntry.message.model : '—');
+        if (toolbarTurns) toolbarTurns.textContent = entries.length + ' turns';
+        if (toolbarCost) toolbarCost.textContent = totalCost > 0 ? '$' + totalCost.toFixed(2) : '$0.00';
+        if (sidebarMetaEl) sidebarMetaEl.innerHTML =
+          '<div class="vwr-stat-row"><span>Entries</span><strong>' + entries.length + '</strong></div>' +
+          '<div class="vwr-stat-row"><span>Estimated cost</span><strong class="vwr-cost-value">$' + totalCost.toFixed(2) + '</strong></div>';
       }
 
       function loadInto(readFn, prefixHtml) {

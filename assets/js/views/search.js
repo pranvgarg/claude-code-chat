@@ -41,11 +41,11 @@
       '<div class="srch-rows" data-loaded="0"><div class="srch-loading">Loading matches…</div></div>' +
     '</section>';
   }
-  function rowHTML(sessionId, turn, html) {
+  function rowHTML(sessionId, turn, html, isCode) {
     return '<a class="srch-row" href="#/viewer?id=' + encodeURIComponent(sessionId) + '&turn=' + encodeURIComponent(turn.uuid || '') + '">' +
       '<span class="srch-rail" style="background:' + ROLE_COLOR[turn.role] + '"></span>' +
       '<span class="srch-row-body"><span class="srch-role" style="color:' + ROLE_COLOR[turn.role] + '">' + ROLE_LABEL[turn.role] + '</span>' +
-      '<span class="srch-snippet">' + html + '</span></span></a>';
+      '<span class="srch-snippet' + (isCode ? ' srch-snippet-code' : '') + '">' + html + '</span></span></a>';
   }
   function fillSnippets(section, hit, desc, terms, query) {
     var rows = section.querySelector('.srch-rows');
@@ -56,7 +56,8 @@
       var shown = hit.turnIdxs.slice(0, SNIPPETS_PER_GROUP);
       rows.innerHTML = shown.map(function (i) {
         var t = turns[i]; if (!t) return '';
-        return rowHTML(desc.id, t, CCE.searchIndex.snippet(t.text, terms).html);
+        var snippet = CCE.searchIndex.snippet(t.text, terms);
+        return rowHTML(desc.id, t, snippet.html, snippet.code);
       }).join('') + (hit.turnIdxs.length > shown.length
         // Pass the raw query (not the tokenized terms) so the viewer's
         // find= search box behaves the same as it would if the user had

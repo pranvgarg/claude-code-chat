@@ -16,11 +16,15 @@
       root.innerHTML =
         '<div class="doc-view">' +
         '<aside class="doc-list" id="doc-list"></aside>' +
+        '<div class="doc-resizer" id="commands-resizer" role="separator" aria-label="Resize commands list" tabindex="0"></div>' +
         '<div class="doc-body" id="doc-body"></div>' +
         '</div>';
 
       var listEl = root.querySelector('#doc-list');
       var bodyEl = root.querySelector('#doc-body');
+      if (CCE.app.initResizable) {
+        CCE.app.initResizable(root.querySelector('#commands-resizer'), listEl, { min: 220, max: 460, key: 'commands-list-width' });
+      }
 
       /*
        * openables[] is a flat array of { read: fn } entries keyed by

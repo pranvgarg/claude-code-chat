@@ -16,11 +16,15 @@
       root.innerHTML =
         '<div class="doc-view">' +
         '<aside class="doc-list" id="doc-list"></aside>' +
+        '<div class="doc-resizer" id="memory-resizer" role="separator" aria-label="Resize memory list" tabindex="0"></div>' +
         '<div class="doc-body" id="doc-body"></div>' +
         '</div>';
 
       var listEl = root.querySelector('#doc-list');
       var bodyEl = root.querySelector('#doc-body');
+      if (CCE.app.initResizable) {
+        CCE.app.initResizable(root.querySelector('#memory-resizer'), listEl, { min: 220, max: 460, key: 'memory-list-width' });
+      }
 
       /*
        * openables[] is a flat array of { read: fn } entries keyed by
@@ -261,9 +265,9 @@
               html +=
                 '<div class="doc-group">' +
                 '<div class="doc-group-header" data-group="' + groupIdx + '" data-project="' +
-                CCE.markdown.esc(project.projectFolder) + '">' +
-                '<span class="doc-chevron">▸</span> ' +
-                CCE.markdown.esc(project.displayPath || project.projectFolder) +
+                CCE.markdown.esc(project.projectFolder) + '" title="' + CCE.markdown.esc(project.displayPath || project.projectFolder) + '">' +
+                '<span class="doc-chevron">▸</span>' +
+                '<span class="doc-group-path">' + CCE.markdown.esc(project.displayPath || project.projectFolder) + '</span>' +
                 ' <span class="doc-group-count">(' + files.length + ')</span>';
 
               if (reconnectFile) {

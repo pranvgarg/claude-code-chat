@@ -307,11 +307,6 @@
       '<path d="M3 6h18M7 12h10M11 18h2"/>' +
       '</svg>Sort <span class="muted" id="cce-sort-label">Recent</span>' +
       '</button>' +
-      '<button class="tbtn" id="cce-group-btn">' +
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-      '<path d="M3 7h18M3 12h18M3 17h18"/>' +
-      '</svg><span id="cce-group-label">Recent</span>' +
-      '</button>' +
       '<select class="tbtn" id="cce-f-project" aria-label="Filter by project"><option value="">All projects</option></select>' +
       '<select class="tbtn" id="cce-f-model" aria-label="Filter by model"><option value="">Any model</option><option value="opus">Opus</option><option value="sonnet">Sonnet</option><option value="haiku">Haiku</option><option value="fable">Fable</option></select>' +
       '<select class="tbtn" id="cce-f-branch" aria-label="Filter by branch"><option value="">Any branch</option></select>' +
@@ -357,17 +352,13 @@
       /* -------------------------------------------------------------- */
       state.view  = CCE.store.get('view', 'list');
       state.sort  = 'Recent';
-      state.group = CCE.store.get('group', 'By project');
+      state.group = 'By project';
       state.filters = { project: '', model: '', branch: '', days: 0, starred: false };
 
       /* Update seg toggle buttons */
       toolbarCtx.querySelectorAll('#cce-seg button').forEach(function (b) {
         b.classList.toggle('on', b.dataset.view === state.view);
       });
-
-      /* Update group label to reflect current state */
-      var groupLabel = filterCtx.querySelector('#cce-group-label');
-      if (groupLabel) groupLabel.textContent = state.group;
 
       /* -------------------------------------------------------------- */
       /* 3. Wire controls                                                 */
@@ -390,16 +381,6 @@
         state.sort = state.sort === 'Recent' ? 'Cost' : state.sort === 'Cost' ? 'Messages' : state.sort === 'Messages' ? 'Project' : 'Recent';
         var lbl = filterCtx.querySelector('#cce-sort-label');
         if (lbl) lbl.textContent = state.sort;
-        if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
-      });
-
-      /* Group toggle: Recent ↔ By project */
-      var groupBtn = filterCtx.querySelector('#cce-group-btn');
-      if (groupBtn) groupBtn.addEventListener('click', function () {
-        state.group = state.group === 'Recent' ? 'By project' : 'Recent';
-        var lbl = filterCtx.querySelector('#cce-group-label');
-        if (lbl) lbl.textContent = state.group;
-        CCE.store.set('group', state.group);
         if (cachedSessions()) renderStage(stage, totalEl, eyebrowEl, cachedSessions());
       });
 

@@ -13,10 +13,13 @@
       if (tb) tb.innerHTML = '<span class="doc-title">Plans</span><div class="spacer"></div>';
 
       /* Set base layout */
-      root.innerHTML = '<div class="doc-view"><aside class="doc-list" id="doc-list"></aside><div class="doc-body" id="doc-body"></div></div>';
+      root.innerHTML = '<div class="doc-view"><aside class="doc-list" id="doc-list"></aside><div class="doc-resizer" id="plans-resizer" role="separator" aria-label="Resize plans list" tabindex="0"></div><div class="doc-body" id="doc-body"></div></div>';
 
       var docList = root.querySelector('#doc-list');
       var docBody = root.querySelector('#doc-body');
+      if (CCE.app.initResizable) {
+        CCE.app.initResizable(root.querySelector('#plans-resizer'), docList, { min: 220, max: 460, key: 'plans-list-width' });
+      }
 
       CCE.fsaccess.listPlans().then(function (plans) {
         if (!plans || plans.length === 0) {

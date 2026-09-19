@@ -18,6 +18,13 @@
       try { current.unmount(); } catch (e) { console.error(e); }
     }
     current = view;
+    var globalSearch = document.getElementById('global-q');
+    var isSearch = hash === '#/search';
+    if (globalSearch && !isSearch) {
+      globalSearch.value = '';
+      globalSearch.placeholder = 'Search sessions, projects, branches…';
+      globalSearch.setAttribute('aria-label', 'Search all sessions, projects, and branches');
+    }
     document.querySelectorAll('.nav-item[data-hash]').forEach(n => {
       const isActive = n.dataset.hash === hash;
       n.classList.toggle('active', isActive);
@@ -82,7 +89,40 @@
   // query (e.g. on load, back/forward nav, or when the search view mounts).
   CCE.app.syncSearchBox = function (term) {
     var q = document.getElementById('global-q');
-    if (q && q.value !== term) q.value = term;
+    if (q) {
+      if (q.value !== term) q.value = term;
+      q.placeholder = 'Search all sessions, projects, branches…';
+      q.setAttribute('aria-label', 'Search all sessions, projects, and branches');
+    }
+  };
+
+  CCE.app.initResizable = function (handle, target, options) {
+    if (!handle || !target) return;
+    var min = options.min || 180, max = options.max || 420, key = options.key;
+    var saved = key && CCE.store.get(key, null);
+    function setSize(width) {
+      var value = Math.max(min, Math.min(max, Number(width))) + 'px';
+      if (options.property) target.style.setProperty(options.property, value);
+      else target.style.width = value;
+    }
+    if (saved) setSize(saved);
+    function stop() {
+      document.body.classList.remove('is-resizing');
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', stop);
+    }
+    function move(e) {
+      var rect = target.getBoundingClientRect();
+      var width = Math.max(min, Math.min(max, e.clientX - rect.left));
+      setSize(width);
+      if (key) CCE.store.set(key, width);
+    }
+    handle.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      document.body.classList.add('is-resizing');
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', stop, { once: true });
+    });
   };
 
   // All sidebar tabs now have real views (registered by their own view files
@@ -97,6 +137,34 @@
         savedTheme = localStorage.getItem('cce-theme') || 'dark';
       }
       document.documentElement.dataset.theme = savedTheme;
+
+      var appShell = document.getElementById('app');
+      var sidebarToggle = document.getElementById('btn-sidebar-toggle');
+      var collapsed = CCE.store.get('sidebar-collapsed', false) === true;
+      function setSidebarCollapsed(next) {
+        collapsed = !!next;
+        appShell.classList.toggle('sidebar-collapsed', collapsed);
+        sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
+        sidebarToggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+        sidebarToggle.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+        CCE.store.set('sidebar-collapsed', collapsed);
+      }
+      setSidebarCollapsed(collapsed);
+      sidebarToggle.addEventListener('click', function () { setSidebarCollapsed(!collapsed); });
+      CCE.app.initResizable(document.getElementById('sidebar-resizer'), appShell, { min: 200, max: 360, key: 'sidebar-width', property: '--sidebar-width' });
+
+      var preferences = document.getElementById('btn-preferences');
+      var preferencesMenu = document.getElementById('prefs-menu');
+      function closePreferences() {
+        preferencesMenu.hidden = true;
+        preferences.setAttribute('aria-expanded', 'false');
+      }
+      preferences.addEventListener('click', function (e) {
+        e.stopPropagation();
+        preferencesMenu.hidden = !preferencesMenu.hidden;
+        preferences.setAttribute('aria-expanded', String(!preferencesMenu.hidden));
+      });
+      document.addEventListener('click', closePreferences);
 
       var q = document.getElementById('global-q');
       if (q) {
@@ -127,15 +195,17 @@
         } else {
           localStorage.setItem('cce-theme', nt);
         }
+        closePreferences();
       });
 
       document.getElementById('btn-export-prefs')?.addEventListener('click', () => {
         const blob = new Blob([CCE.store.exportPrefs()], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob); a.download = 'explorer-prefs.json'; a.click();
+        closePreferences();
       });
       const pf = document.getElementById('prefs-file');
-      document.getElementById('btn-import-prefs')?.addEventListener('click', () => pf.click());
+      document.getElementById('btn-import-prefs')?.addEventListener('click', () => { closePreferences(); pf.click(); });
       pf?.addEventListener('change', async () => {
         if (!pf.files[0]) return;
         const ok = CCE.store.importPrefs(await pf.files[0].text());

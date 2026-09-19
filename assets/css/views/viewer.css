@@ -12,11 +12,22 @@
   overflow: hidden;
   transition: width 0.2s ease;
   background: var(--surface);
-  border-right: 1px solid var(--border);
+  border-left: 1px solid var(--border);
   flex-shrink: 0;
 }
-.vwr-sidebar.vwr-sidebar-open { width: 260px; overflow-y: auto; }
-.vwr-sidebar-content { padding: 8px; }
+.vwr-sidebar.vwr-sidebar-open { width: 280px; overflow-y: auto; }
+.vwr-sidebar-content { padding: 16px; }
+.vwr-rail-section { padding-bottom:16px; margin-bottom:16px; border-bottom:1px solid var(--border-soft); }
+.vwr-rail-label { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--text-faint); margin-bottom:9px; }
+.vwr-rail-find .vwr-search-row { width:100%; }
+.vwr-rail-find .vwr-search-input { width:100%; min-width:0; }
+.vwr-rail-stats { display:flex; flex-direction:column; gap:8px; }
+.vwr-stat-row { display:flex; justify-content:space-between; gap:12px; font-family:var(--font-mono); font-size:11.5px; color:var(--text-faint); }
+.vwr-stat-row strong { color:var(--text-dim); font-weight:500; }
+.vwr-stat-row .vwr-cost-value { color:var(--c-cost); }
+.vwr-rail-outline { min-height:120px; }
+.vwr-rail-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.vwr-rail-actions .vwr-btn { flex:1 1 110px; }
 
 .vwr-main {
   flex: 1;
@@ -86,6 +97,8 @@
 }
 
 .vwr-session-id { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.vwr-toolbar-meta { font-family:var(--font-mono); font-size:var(--fs-xs); color:var(--text-faint); white-space:nowrap; }
+.vwr-toolbar-cost { font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--c-cost); font-weight:600; white-space:nowrap; }
 
 .vwr-filter-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .vwr-filter-label { font-size: 11.5px; color: var(--text-dim); display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
@@ -333,7 +346,7 @@ mark.vwr-active-match { background: rgba(255,200,50,.6); outline: 2px solid rgba
 /* ---- Responsive sidebar ---- */
 @media (max-width: 768px) {
   .vwr-sidebar.vwr-sidebar-open {
-    position: fixed; top: 0; left: 0; height: 100vh; z-index: 200; width: 260px;
+    position: fixed; top: 0; right: 0; left: auto; height: 100vh; z-index: 200; width: 260px;
   }
 }
 

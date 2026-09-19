@@ -103,14 +103,17 @@
   }
   function snippet(text, terms, radius) {
     radius = radius || 80;
-    const src = String(text || ''), lower = src.toLowerCase();
+    const raw = String(text || '');
+    const code = /```/.test(raw) || /^(?:    |\t)\S/m.test(raw);
+    const src = raw.replace(/```[\w-]*\s*/g, '').replace(/```/g, '').replace(/^ {4}/gm, '').replace(/^\t/gm, '');
+    const lower = src.toLowerCase();
     let first = -1, firstLen = 0;
     for (const t of terms) {
       const tl = t.toLowerCase();
       const i = lower.indexOf(tl);
       if (i !== -1 && (first === -1 || i < first)) { first = i; firstLen = tl.length; }
     }
-    if (first === -1) return { html: esc(src.slice(0, radius * 2)) + (src.length > radius * 2 ? '…' : '') };
+    if (first === -1) return { html: esc(src.slice(0, radius * 2)) + (src.length > radius * 2 ? '…' : ''), code: code };
     // Centre the window on the match itself (not just its start) so a
     // short radius still shows context on both sides of the hit.
     const center = first + Math.floor(firstLen / 2);
@@ -118,7 +121,7 @@
     let html = esc(src.slice(start, end));
     const re = new RegExp('(' + terms.map(function (t) { return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|') + ')', 'gi');
     html = html.replace(re, '<mark>$1</mark>');
-    return { html: (start > 0 ? '…' : '') + html + (end < src.length ? '…' : '') };
+    return { html: (start > 0 ? '…' : '') + html + (end < src.length ? '…' : ''), code: code };
   }
   CCE.searchIndex = { tokenize, extractTurns, build, query, snippet };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

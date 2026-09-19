@@ -73,7 +73,7 @@
   /* ---- Motion tiers ---- */
   --motion-fast:  .12s;
   --motion-base:  .18s;
-  --motion-slow:  .5s;
+  --motion-slow:  .18s;
   --ease: cubic-bezier(.4, 0, .2, 1);
 
   /* ---- Gradients (reused across views) ---- */
